@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Script from "next/script";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -35,14 +36,10 @@ export default function CheckoutPage() {
     setIsLoading(true);
 
     try {
-      // 1. Get current buyer (for MVP, if not logged in, we can either force login or use a dummy buyer)
-      // Since we just built auth, let's try to get the user.
+      // 1. Get current buyer
       const { data: { user } } = await supabase.auth.getUser();
-
       let buyerId = user?.id;
 
-      // If not logged in, for this MVP demo, we will create an anonymous order if RLS allows it.
-      // But our RLS requires buyer_id to be auth.uid().
       if (!user) {
         alert("Kamu harus login sebagai Buyer untuk melakukan checkout. Silakan login terlebih dahulu.");
         router.push("/login");
@@ -56,7 +53,8 @@ export default function CheckoutPage() {
           buyer_id: buyerId,
           store_id: storeId,
           total_price: grandTotal,
-          status: 'pending'
+          status: 'pending',
+          payment_method: paymentMethod
         }])
         .select()
         .single();
@@ -77,7 +75,57 @@ export default function CheckoutPage() {
 
       if (itemsError) throw itemsError;
 
-      // Success
+      // 4. Trigger Midtrans if payment method is transfer
+      if (paymentMethod === 'transfer') {
+        const response = await fetch('/api/payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: orderData.id,
+            grossAmount: grandTotal,
+          })
+        });
+        
+        const paymentData = await response.json();
+
+        if (paymentData.token) {
+          (window as any).snap.pay(paymentData.token, {
+            onSuccess: function(result: any) {
+              console.log("Payment success", result);
+              clearCart();
+              setIsSuccess(true);
+              setIsLoading(false);
+            },
+            onPending: function(result: any) {
+              console.log("Payment pending", result);
+              clearCart();
+              setIsSuccess(true);
+              setIsLoading(false);
+            },
+            onError: function(result: any) {
+              console.error("Payment error", result);
+              alert("Pembayaran gagal!");
+              setIsLoading(false);
+            },
+            onClose: function() {
+              console.log("Payment popup closed");
+              setIsLoading(false);
+            }
+          });
+          return; // Stop execution here because Snap handles the success/fail states
+        } else {
+          throw new Error(paymentData.error || "Gagal mendapatkan token pembayaran");
+        }
+      }
+
+      // Success for COD
+      // Notify seller
+      await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: orderData.id })
+      }).catch(err => console.error("Error notifying seller:", err));
+
       clearCart();
       setIsSuccess(true);
 
@@ -85,7 +133,9 @@ export default function CheckoutPage() {
       console.error("Checkout error:", error);
       alert(`Gagal membuat pesanan: ${error.message}`);
     } finally {
-      setIsLoading(false);
+      if (paymentMethod !== 'transfer') {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -121,6 +171,11 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-gray-50/50 pb-24">
+      <Script 
+        src="https://app.sandbox.midtrans.com/snap/snap.js"
+        data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || ""}
+        strategy="lazyOnload"
+      />
       {/* Header */}
       <header className="sticky top-0 z-10 bg-white border-b px-4 py-3 shadow-sm">
         <div className="max-w-4xl mx-auto flex items-center gap-3">

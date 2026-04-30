@@ -1,16 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-
-export const createClient = (request: NextRequest) => {
-  // Create an unmodified response
+export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request: {
       headers: request.headers,
     },
   });
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
   const supabase = createServerClient(
     supabaseUrl!,
@@ -18,20 +17,41 @@ export const createClient = (request: NextRequest) => {
     {
       cookies: {
         getAll() {
-          return request.cookies.getAll()
+          return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
           supabaseResponse = NextResponse.next({
             request,
-          })
+          });
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
-          )
+          );
         },
       },
-    },
+    }
   );
 
-  return supabaseResponse
-};
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const isSellerRoute = request.nextUrl.pathname.startsWith('/seller');
+  const isCheckoutRoute = request.nextUrl.pathname.startsWith('/checkout');
+  const isOrdersRoute = request.nextUrl.pathname.startsWith('/orders');
+  
+  const isLoginRoute = request.nextUrl.pathname.startsWith('/login');
+
+  if (!user && (isSellerRoute || isCheckoutRoute || isOrdersRoute)) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    url.searchParams.set('redirect_to', request.nextUrl.pathname);
+    return NextResponse.redirect(url);
+  }
+
+  if (user && isLoginRoute) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/';
+    return NextResponse.redirect(url);
+  }
+
+  return supabaseResponse;
+}
