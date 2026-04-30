@@ -19,7 +19,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { orderId, status, paymentStatus } = await request.json();
+    const { orderId, status, paymentStatus, rejectionReason } = await request.json();
 
     if (!orderId || (!status && !paymentStatus)) {
       return NextResponse.json({ error: 'orderId and either status or paymentStatus are required' }, { status: 400 });
@@ -28,13 +28,14 @@ export async function PATCH(request: Request) {
     const updates: any = { updated_at: new Date().toISOString() };
     if (status) updates.status = status;
     if (paymentStatus) updates.payment_status = paymentStatus;
+    if (rejectionReason) updates.rejection_reason = rejectionReason;
 
     // Update order in Supabase
     const { data: updatedOrder, error } = await supabase
       .from('orders')
       .update(updates)
       .eq('id', orderId)
-      .select('*, profiles!orders_buyer_id_fkey(phone, full_name)')
+      .select('*, profiles!orders_buyer_id_fkey(phone, full_name), stores(owner_id)')
       .single();
 
     if (error) {
@@ -42,26 +43,50 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Failed to update order' }, { status: 500 });
     }
 
-    // Trigger WA Notification to Buyer via Fonnte ONLY if status changed
-    if (status && updatedOrder && updatedOrder.profiles?.phone) {
-      const buyerPhone = updatedOrder.profiles.phone;
+    // Trigger WA Notification via Fonnte ONLY if status changed
+    if (status && updatedOrder) {
       const shortOrderId = orderId.split('-')[0].toUpperCase();
       let message = '';
+      let targetPhone = '';
 
-      if (status === 'accepted') {
-        message = `Halo ${updatedOrder.profiles.full_name || 'Pembeli'}, pesanan Anda dengan ID ${shortOrderId} telah DITERIMA oleh toko dan sedang disiapkan.`;
-      } else if (status === 'in_delivery') {
-        message = `Halo ${updatedOrder.profiles.full_name || 'Pembeli'}, pesanan Anda dengan ID ${shortOrderId} sedang DALAM PENGIRIMAN oleh kurir.`;
+      if (status === 'canceled' && updatedOrder.stores?.owner_id) {
+        // Canceled by buyer -> Notify Seller
+        // Fetch seller profile
+        const { data: sellerProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('phone')
+          .eq('id', updatedOrder.stores.owner_id)
+          .single();
+        
+        if (sellerProfile?.phone) {
+          targetPhone = sellerProfile.phone;
+          message = `Halo Seller! Pesanan dengan ID ${shortOrderId} telah DIBATALKAN oleh pembeli.`;
+        }
+      } else if (updatedOrder.profiles?.phone) {
+        // Notify Buyer
+        targetPhone = updatedOrder.profiles.phone;
+        const buyerName = updatedOrder.profiles.full_name || 'Pembeli';
+
+        if (status === 'accepted') {
+          message = `Halo ${buyerName}, pesanan Anda dengan ID ${shortOrderId} telah DITERIMA oleh toko dan sedang disiapkan.`;
+        } else if (status === 'in_delivery') {
+          message = `Halo ${buyerName}, pesanan Anda dengan ID ${shortOrderId} sedang DALAM PENGIRIMAN oleh kurir.`;
+        } else if (status === 'rejected') {
+          const reasonNote = rejectionReason ? ` Alasan: ${rejectionReason}.` : '';
+          message = `Halo ${buyerName}, mohon maaf, pesanan Anda dengan ID ${shortOrderId} telah DITOLAK oleh toko.${reasonNote}`;
+        } else if (status === 'expired') {
+          message = `Halo ${buyerName}, mohon maaf, pesanan Anda dengan ID ${shortOrderId} dibatalkan otomatis karena toko sedang sibuk / tidak merespon.`;
+        }
       }
 
-      if (message) {
+      if (message && targetPhone) {
         // We can call Fonnte directly here to save HTTP calls
         const fonnteToken = process.env.FONNTE_TOKEN || process.env.NEXT_PUBLIC_FONNTE_TOKEN;
         if (fonnteToken) {
           await fetch("https://api.fonnte.com/send", {
             method: "POST",
-            headers: { Authorization: fonnteToken },
-            body: new URLSearchParams({ target: buyerPhone, message })
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: fonnteToken },
+            body: new URLSearchParams({ target: targetPhone, message })
           }).catch(err => console.error("Fonnte order update error:", err));
         }
       }

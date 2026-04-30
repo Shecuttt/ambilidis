@@ -1,49 +1,102 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, use, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useCartStore } from "@/lib/store";
-import { ArrowLeft, Store, Star, ShoppingBag, Plus, Minus } from "lucide-react";
+import {
+  ArrowLeft, Star, ShoppingBag, Plus, Minus,
+  MapPin, MessageSquareQuote, Package
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog, DialogContent, DialogDescription,
+  DialogFooter, DialogHeader, DialogTitle
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { formatRp } from "@/lib/utils";
 
+// ── Types ────────────────────────────────────────────────────
+interface StoreData {
+  id: string;
+  name: string;
+  description: string | null;
+  photo_url: string | null;
+  is_open: boolean;
+  tagline_today: string | null;
+  address: string | null;
+}
+
+interface ProductData {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  unit: string;
+  photo_url: string | null;
+  is_available: boolean;
+}
+
+// ── Main Component ───────────────────────────────────────────
 export default function StoreDetail({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { id } = use(params);
 
-  const [store, setStore] = useState<any>(null);
-  const [products, setProducts] = useState<any[]>([]);
+  const [store, setStore] = useState<StoreData | null>(null);
+  const [products, setProducts] = useState<ProductData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const { items, addItem, removeItem, updateQuantity, getTotal, storeId: cartStoreId } = useCartStore();
+  // Cart conflict dialog state (Section 4: validasi 1 toko 1 keranjang)
+  const [conflictProduct, setConflictProduct] = useState<ProductData | null>(null);
+
+  const { items, addItem, forceAddItem, updateQuantity, getTotal, storeId: cartStoreId } = useCartStore();
   const cartTotalItems = items.reduce((acc, item) => acc + item.quantity, 0);
+
+  const getProductQty = useCallback(
+    (productId: string) => items.find(i => i.id === productId)?.quantity || 0,
+    [items]
+  );
+
+  // handleAdd: intercepts conflict from different store
+  const handleAdd = (product: ProductData) => {
+    if (!store) return;
+    const result = addItem(product, store.id);
+    if (result === "conflict") {
+      setConflictProduct(product);
+    }
+  };
+
+  const handleForceAdd = () => {
+    if (!conflictProduct || !store) return;
+    forceAddItem(conflictProduct, store.id);
+    setConflictProduct(null);
+  };
 
   useEffect(() => {
     fetchStoreAndProducts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const fetchStoreAndProducts = async () => {
     setIsLoading(true);
 
-    // Fetch store
     const { data: storeData } = await supabase
-      .from('stores')
-      .select('*')
-      .eq('id', id)
+      .from("stores")
+      .select("id, name, description, photo_url, is_open, tagline_today, address")
+      .eq("id", id)
       .single();
 
     if (storeData) {
       setStore(storeData);
 
-      // Fetch products
       const { data: productsData } = await supabase
-        .from('products')
-        .select('*')
-        .eq('store_id', id)
-        .eq('is_available', true)
-        .order('name');
+        .from("products")
+        .select("id, name, description, price, unit, photo_url, is_available")
+        .eq("store_id", id)
+        .order("is_available", { ascending: false })
+        .order("name");
 
       if (productsData) setProducts(productsData);
     }
@@ -51,140 +104,314 @@ export default function StoreDetail({ params }: { params: Promise<{ id: string }
     setIsLoading(false);
   };
 
-  const getProductQuantity = (productId: string) => {
-    return items.find(item => item.id === productId)?.quantity || 0;
-  };
-
   if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center">Memuat toko...</div>;
+    return (
+      <div className="min-h-screen bg-gray-50/50">
+        <Skeleton className="w-full h-64 rounded-none" />
+        <div className="max-w-4xl mx-auto p-4 space-y-4 mt-4">
+          <Skeleton className="h-24 w-3/4 rounded-xl" />
+          <Skeleton className="h-16 w-full rounded-xl" />
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex gap-4 p-3 bg-white rounded-xl border">
+              <Skeleton className="h-20 w-20 shrink-0 rounded-lg" />
+              <div className="flex-1 space-y-2 py-2">
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-3 w-1/4" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   if (!store) {
-    return <div className="min-h-screen flex items-center justify-center">Toko tidak ditemukan.</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <p className="text-gray-500">Toko tidak ditemukan.</p>
+          <Button onClick={() => router.back()} variant="outline">Kembali</Button>
+        </div>
+      </div>
+    );
   }
 
+  const availableProducts = products.filter(p => p.is_available);
+  const unavailableProducts = products.filter(p => !p.is_available);
+
   return (
-    <div className="min-h-screen bg-gray-50/50 pb-24">
-      {/* Header */}
-      <header className="sticky top-0 z-10 bg-white border-b px-4 py-3 shadow-sm">
-        <div className="max-w-4xl mx-auto flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.back()}>
-            <ArrowLeft className="h-6 w-6" />
-          </Button>
-          <div className="flex-1 truncate">
-            <h1 className="text-lg font-bold text-gray-900 truncate">{store.name}</h1>
+    <div className="min-h-screen bg-gray-50/50 pb-28">
+
+      {/* ── Wide Store Header ── */}
+      <div className="relative w-full h-64 bg-gray-300 overflow-hidden">
+        {store.photo_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={store.photo_url}
+            alt={store.name}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-linear-to-br from-primary/30 to-primary/10 flex items-center justify-center">
+            <ShoppingBag className="h-24 w-24 text-primary/20" />
           </div>
+        )}
+
+        <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/20 to-transparent" />
+
+        {/* Back button */}
+        <button
+          onClick={() => router.back()}
+          className="absolute top-4 left-4 bg-black/30 backdrop-blur-sm text-white rounded-full p-2 hover:bg-black/50 transition-colors"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </button>
+
+        {/* Status badge — shadcn Badge */}
+        <div className="absolute top-4 right-4">
+          {store.is_open ? (
+            <Badge className="bg-green-500 text-white border-transparent gap-1.5 shadow-lg">
+              <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+              Buka
+            </Badge>
+          ) : (
+            <Badge variant="secondary" className="bg-gray-700/80 text-white border-transparent backdrop-blur-sm">
+              Tutup
+            </Badge>
+          )}
         </div>
-      </header>
 
-      <main className="max-w-4xl mx-auto">
-        {/* Store Info Banner */}
-        <div className="bg-white p-4 border-b">
-          <div className="flex items-start gap-4">
-            <div className="h-16 w-16 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
-              <Store className="h-8 w-8 text-primary" />
-            </div>
-            <div className="space-y-1 flex-1">
-              <h2 className="font-bold text-xl">{store.name}</h2>
-              <p className="text-sm text-gray-500">{store.description || "Toko Sembako Pilihan"}</p>
-              <div className="flex items-center gap-4 text-xs font-medium pt-1">
-                <span className="flex items-center text-amber-500">
-                  <Star className="h-3.5 w-3.5 fill-current mr-1" />
-                  4.8 (120+)
-                </span>
-                <span className={`flex items-center ${store.is_open ? 'text-green-600' : 'text-red-500'}`}>
-                  {store.is_open ? 'Buka Sekarang' : 'Tutup'}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Product List */}
-        <div className="p-4 space-y-4">
-          <h3 className="font-bold text-lg">Daftar Produk</h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {products.length === 0 ? (
-              <div className="text-center py-10 text-muted-foreground bg-white rounded-xl border border-dashed">
-                Belum ada produk tersedia.
-              </div>
-            ) : (
-              products.map((product) => {
-                const qty = getProductQuantity(product.id);
-
-                return (
-                  <Card key={product.id} className="overflow-hidden border-0 shadow-sm rounded-xl">
-                    <CardContent className="p-4 flex items-center gap-4">
-                      <div className="h-16 w-16 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
-                        {/* Placeholder for product image */}
-                        <ShoppingBag className="h-6 w-6 text-gray-400" />
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <h4 className="font-semibold text-gray-900 leading-tight">{product.name}</h4>
-                        <div className="text-sm font-bold text-primary">
-                          Rp {product.price.toLocaleString('id-ID')} <span className="text-xs text-gray-500 font-normal">/ {product.unit}</span>
-                        </div>
-                      </div>
-
-                      <div className="shrink-0">
-                        {qty === 0 ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="rounded-full px-4 border-primary text-primary hover:bg-primary/5"
-                            onClick={() => addItem(product, store.id)}
-                            disabled={!store.is_open}
-                          >
-                            Tambah
-                          </Button>
-                        ) : (
-                          <div className="flex items-center gap-3 bg-gray-50 rounded-full border p-1">
-                            <button
-                              className="h-7 w-7 flex items-center justify-center rounded-full bg-white shadow-sm border text-gray-600 hover:bg-gray-50"
-                              onClick={() => updateQuantity(product.id, qty - 1)}
-                            >
-                              <Minus className="h-3 w-3" />
-                            </button>
-                            <span className="text-sm font-bold w-4 text-center">{qty}</span>
-                            <button
-                              className="h-7 w-7 flex items-center justify-center rounded-full bg-primary text-white shadow-sm hover:bg-primary/90"
-                              onClick={() => addItem(product, store.id)}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })
+        {/* Store info overlay */}
+        <div className="absolute bottom-0 left-0 right-0 px-5 pb-5 text-white">
+          <h1 className="text-2xl font-bold drop-shadow-md leading-tight">{store.name}</h1>
+          <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+            <span className="flex items-center text-white/80 text-xs">
+              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400 mr-1" />
+              4.8
+            </span>
+            {store.address && (
+              <span className="flex items-center text-white/70 text-xs gap-1">
+                <MapPin className="h-3 w-3" />
+                {store.address}
+              </span>
             )}
           </div>
         </div>
-      </main>
+      </div>
 
-      {/* Floating Cart Button */}
+      {/* ── Sapaan Hari Ini ── */}
+      {store.tagline_today && (
+        <div className="max-w-4xl mx-auto px-4 pt-4">
+          <div className="bg-primary/5 border border-primary/10 rounded-2xl px-4 py-3 flex items-start gap-3">
+            <MessageSquareQuote className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs text-primary/70 font-medium uppercase tracking-wider mb-0.5">Sapaan Hari Ini</p>
+              <p className="text-sm text-gray-800 font-medium italic">"{store.tagline_today}"</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Deskripsi toko ── */}
+      {store.description && (
+        <div className="max-w-4xl mx-auto px-4 pt-3">
+          <p className="text-sm text-gray-500">{store.description}</p>
+        </div>
+      )}
+
+      {/* ── Product List ── */}
+      <div className="max-w-4xl mx-auto px-4 pt-5 space-y-5">
+        <h2 className="font-bold text-lg text-gray-900">
+          Produk ({availableProducts.length} tersedia)
+        </h2>
+
+        {products.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground bg-white rounded-xl border border-dashed">
+            Belum ada produk yang ditampilkan.
+          </div>
+        ) : (
+          <div className="space-y-6">
+
+            {/* Available products */}
+            {availableProducts.length > 0 && (
+              <div className="space-y-3">
+                {availableProducts.map(product => {
+                  const qty = getProductQty(product.id);
+                  return (
+                    <AvailableProductRow
+                      key={product.id}
+                      product={product}
+                      qty={qty}
+                      storeIsOpen={store.is_open}
+                      onAdd={() => handleAdd(product)}
+                      onInc={() => updateQuantity(product.id, qty + 1)}
+                      onDec={() => updateQuantity(product.id, Math.max(0, qty - 1))}
+                    />
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Unavailable products — non-interactive */}
+            {unavailableProducts.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-1">Stok Habis</p>
+                {unavailableProducts.map(product => (
+                  <UnavailableProductRow key={product.id} product={product} />
+                ))}
+              </div>
+            )}
+
+          </div>
+        )}
+      </div>
+
+      {/* ── Floating Cart Button ── */}
       {cartTotalItems > 0 && cartStoreId === id && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-linear-to-t from-white via-white to-transparent pb-6">
-          <div className="max-w-4xl mx-auto pointer-events-auto">
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-linear-to-t from-white via-white to-transparent pb-6 z-30">
+          <div className="max-w-4xl mx-auto">
             <Link href="/checkout">
               <Button className="w-full h-14 rounded-2xl shadow-lg flex items-center justify-between px-6 text-lg">
                 <div className="flex items-center gap-3">
-                  <div className="bg-white/20 px-2 py-1 rounded-lg text-sm font-bold">
+                  <div className="bg-white/20 px-2.5 py-1 rounded-lg text-sm font-bold">
                     {cartTotalItems} Item
                   </div>
                   <span className="font-semibold">Checkout</span>
                 </div>
-                <span className="font-bold">
-                  Rp {getTotal().toLocaleString('id-ID')}
-                </span>
+                <span className="font-bold">{formatRp(getTotal())}</span>
               </Button>
             </Link>
           </div>
         </div>
       )}
+
+      {/* ── Cart Conflict Dialog (Section 4: 1 Toko 1 Keranjang) ── */}
+      <Dialog open={!!conflictProduct} onOpenChange={(open) => !open && setConflictProduct(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Ganti Toko?</DialogTitle>
+            <DialogDescription>
+              Keranjangmu berisi produk dari toko lain.
+              Menambahkan produk ini akan <strong>menghapus keranjang lama</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConflictProduct(null)}>Batal</Button>
+            <Button onClick={handleForceAdd}>Ganti & Tambahkan</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+    </div>
+  );
+}
+
+// ── Available Product Row ─────────────────────────────────────
+function AvailableProductRow({
+  product, qty, storeIsOpen, onAdd, onInc, onDec,
+}: {
+  product: ProductData;
+  qty: number;
+  storeIsOpen: boolean;
+  onAdd: () => void;
+  onInc: () => void;
+  onDec: () => void;
+}) {
+  return (
+    <div className="bg-white rounded-2xl border shadow-sm overflow-hidden flex items-center gap-3 pr-4 hover:shadow-md transition-shadow">
+      {/* Thumbnail */}
+      <div className="h-20 w-20 shrink-0 overflow-hidden bg-gray-100">
+        {product.photo_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={product.photo_url} alt={product.name} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Package className="h-7 w-7 text-gray-300" />
+          </div>
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0 py-3 space-y-0.5">
+        <p className="font-semibold text-gray-900 text-sm leading-tight line-clamp-1">{product.name}</p>
+        {product.description && (
+          <p className="text-xs text-gray-400 line-clamp-1">{product.description}</p>
+        )}
+        <div className="text-sm font-bold text-primary">
+          {formatRp(product.price)}
+          <span className="text-xs text-gray-400 font-normal ml-1">/ {product.unit}</span>
+        </div>
+      </div>
+
+      {/* Quick add — only if store is open */}
+      {storeIsOpen ? (
+        <div className="shrink-0">
+          {qty === 0 ? (
+            <button
+              onClick={onAdd}
+              className="h-9 w-9 flex items-center justify-center rounded-full bg-primary text-white hover:bg-primary/90 active:scale-95 transition-all shadow-sm"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 bg-gray-50 rounded-full border px-1.5 py-1">
+              <button
+                onClick={onDec}
+                className="h-7 w-7 flex items-center justify-center rounded-full bg-white shadow-sm border text-gray-600 hover:bg-gray-50 active:scale-95 transition-all"
+              >
+                <Minus className="h-3 w-3" />
+              </button>
+              <span className="text-sm font-bold w-4 text-center text-gray-900">{qty}</span>
+              <button
+                onClick={onInc}
+                className="h-7 w-7 flex items-center justify-center rounded-full bg-primary text-white shadow-sm hover:bg-primary/90 active:scale-95 transition-all"
+              >
+                <Plus className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <Badge variant="outline" className="shrink-0 text-gray-400 border-gray-200">
+          Tutup
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+// ── Unavailable Product Row ───────────────────────────────────
+function UnavailableProductRow({ product }: { product: ProductData }) {
+  return (
+    <div className="bg-white rounded-2xl border overflow-hidden flex items-center gap-3 pr-4 opacity-50 cursor-not-allowed select-none">
+      {/* Thumbnail — greyscale */}
+      <div className="h-20 w-20 shrink-0 overflow-hidden bg-gray-100 grayscale">
+        {product.photo_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={product.photo_url} alt={product.name} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Package className="h-7 w-7 text-gray-300" />
+          </div>
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0 py-3 space-y-0.5">
+        <p className="font-semibold text-gray-700 text-sm leading-tight line-clamp-1">{product.name}</p>
+        {product.description && (
+          <p className="text-xs text-gray-400 line-clamp-1">{product.description}</p>
+        )}
+        <div className="text-sm font-medium text-gray-400">
+          {formatRp(product.price)}
+          <span className="text-xs font-normal ml-1">/ {product.unit}</span>
+        </div>
+      </div>
+
+      {/* Habis badge — shadcn Badge */}
+      <Badge variant="destructive" className="shrink-0 bg-red-50 text-red-500 border-red-100 hover:bg-red-50">
+        Habis
+      </Badge>
     </div>
   );
 }

@@ -11,7 +11,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
 import { Store, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 const authSchema = z.object({
   email: z.string().email({ message: "Email tidak valid." }),
@@ -66,7 +69,7 @@ export default function LoginPage() {
 
         if (signUpError) throw signUpError;
 
-        alert("Pendaftaran berhasil! Silakan login.");
+        toast.success("Pendaftaran berhasil! Silakan login.");
         setIsSignUp(false);
         reset();
       } else {
@@ -147,10 +150,11 @@ export default function LoginPage() {
               )}
             </div>
 
+            {/* Error message — shadcn Alert */}
             {errorMsg && (
-              <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md border border-red-100">
-                {errorMsg}
-              </div>
+              <Alert variant="destructive">
+                <AlertDescription>{errorMsg}</AlertDescription>
+              </Alert>
             )}
 
             <Button className="w-full font-semibold" type="submit" disabled={isLoading}>
@@ -168,13 +172,12 @@ export default function LoginPage() {
           </form>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
+          {/* Separator — shadcn Separator */}
           <div className="relative w-full">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-muted-foreground">Atau</span>
-            </div>
+            <Separator />
+            <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-2 text-xs text-muted-foreground uppercase">
+              Atau
+            </span>
           </div>
           <Button
             variant="ghost"

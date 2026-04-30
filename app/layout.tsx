@@ -1,12 +1,13 @@
+import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
+import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const jakartaSans = Plus_Jakarta_Sans({
   variable: "--font-jakarta-sans",
   subsets: ["latin"],
 });
-
-import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Ambilidis",
@@ -20,10 +21,16 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="id"
       className={`${jakartaSans.className} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <TooltipProvider>
+          {children}
+        </TooltipProvider>
+        {/* Sonner toast notifications — dipakai di seluruh app */}
+        <Toaster richColors position="top-center" />
+      </body>
     </html>
   );
 }
