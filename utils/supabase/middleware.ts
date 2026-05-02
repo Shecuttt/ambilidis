@@ -29,15 +29,21 @@ export async function updateSession(request: NextRequest) {
           );
         },
       },
+      cookieOptions: {
+        maxAge: 172800, // 48 jam dalam detik
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+      }
     }
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  // Refresh session if expired
+  const { data: { user }, error } = await supabase.auth.getUser();
 
   const isSellerRoute = request.nextUrl.pathname.startsWith('/seller');
   const isCheckoutRoute = request.nextUrl.pathname.startsWith('/checkout');
   const isOrdersRoute = request.nextUrl.pathname.startsWith('/orders');
-  
   const isLoginRoute = request.nextUrl.pathname.startsWith('/login');
 
   if (!user && (isSellerRoute || isCheckoutRoute || isOrdersRoute)) {

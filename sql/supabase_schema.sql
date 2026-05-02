@@ -82,11 +82,20 @@ CREATE POLICY "Users can read their own orders." ON orders FOR SELECT USING (
   auth.uid() = buyer_id OR 
   EXISTS (SELECT 1 FROM stores WHERE stores.id = orders.store_id AND stores.owner_id = auth.uid())
 );
+
 -- Buyers can create orders
 CREATE POLICY "Buyers can insert orders." ON orders FOR INSERT WITH CHECK (auth.uid() = buyer_id);
--- Sellers can update orders for their store
+
+-- Sellers can update orders for their store (status, payment_status, rejection_reason)
 CREATE POLICY "Sellers can update orders." ON orders FOR UPDATE USING (
   EXISTS (SELECT 1 FROM stores WHERE stores.id = orders.store_id AND stores.owner_id = auth.uid())
+);
+
+-- Buyers can update orders (specifically to 'completed' or 'canceled')
+CREATE POLICY "Buyers can update their own orders." ON orders FOR UPDATE USING (
+  auth.uid() = buyer_id
+) WITH CHECK (
+  auth.uid() = buyer_id AND (status IN ('completed', 'canceled'))
 );
 
 -- Order items matching policies

@@ -2,6 +2,12 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import midtransClient from 'midtrans-client';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
+
+const supabaseAdmin = createAdminClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+);
 
 export async function POST(request: Request) {
   try {
@@ -41,9 +47,12 @@ export async function POST(request: Request) {
 
     const transaction = await snap.createTransaction(parameter);
 
-    // Save payment_token to database
-    await supabase.from('orders')
-      .update({ payment_token: transaction.token })
+    // Save payment_token and auto-set payment_status to 'paid' (requested flow)
+    await supabaseAdmin.from('orders')
+      .update({ 
+        payment_token: transaction.token,
+        payment_status: 'paid' 
+      })
       .eq('id', orderId);
 
     return NextResponse.json({

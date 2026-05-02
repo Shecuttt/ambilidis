@@ -57,15 +57,37 @@ CREATE TABLE IF NOT EXISTS ratings (
   UNIQUE (order_id)                 -- 1 rating per order
 );
 
--- RLS: buyer hanya bisa insert rating miliknya sendiri
+-- RLS: buyer hanya bisa insert/update rating miliknya sendiri
 ALTER TABLE ratings ENABLE ROW LEVEL SECURITY;
+
+-- Pastikan user hanya bisa melihat rating (saat ini siapa saja yang terautentikasi bisa melihat semua rating)
+CREATE POLICY "Anyone can read ratings"
+  ON ratings FOR SELECT
+  TO authenticated
+  USING (true);
 
 CREATE POLICY "Buyer can insert own rating"
   ON ratings FOR INSERT
   TO authenticated
   WITH CHECK (buyer_id = auth.uid());
 
-CREATE POLICY "Anyone can read ratings"
-  ON ratings FOR SELECT
+CREATE POLICY "Buyer can update own rating"
+  ON ratings FOR UPDATE
   TO authenticated
-  USING (true);
+  USING (buyer_id = auth.uid())
+  WITH CHECK (buyer_id = auth.uid());
+
+-- Opsional: Buyer bisa menghapus rating miliknya
+CREATE POLICY "Buyer can delete own rating"
+  ON ratings FOR DELETE
+  TO authenticated
+  USING (buyer_id = auth.uid());
+
+-- Tambahkan kolom logo_url dan banner_url ke tabel stores
+ALTER TABLE stores 
+ADD COLUMN IF NOT EXISTS logo_url TEXT,
+ADD COLUMN IF NOT EXISTS banner_url TEXT;
+
+-- (Opsional) Berikan izin SELECT publik agar foto bisa tampil di aplikasi
+-- Jika Anda sudah mengaktifkan RLS di tabel stores, pastikan ada policy SELECT
+-- CREATE POLICY "Allow public read access" ON stores FOR SELECT USING (true);

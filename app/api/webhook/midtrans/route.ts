@@ -11,7 +11,6 @@ const supabaseAdmin = createClient(
 export async function POST(request: Request) {
   try {
     const payload = await request.json();
-    console.log('Midtrans Webhook Payload:', payload);
 
     const {
       order_id,

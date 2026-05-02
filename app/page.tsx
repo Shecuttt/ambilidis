@@ -1,208 +1,219 @@
-"use client";
-
-import { useState, useEffect } from "react";
-import { Search, ShoppingBag, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
-import { supabase } from "@/lib/supabase";
-import { haversineKm } from "@/lib/utils";
-import { StoreCard } from "@/components/StoreCard";
-import { LocationBanner, LocationBar, loadSavedLocation, clearSavedLocation } from "@/components/LocationBanner";
+import { ArrowRight, Store, ShoppingCart, Truck, CheckCircle2, Star } from "lucide-react";
 import Link from "next/link";
-import { useCartStore } from "@/lib/store";
 
-// ── Types ─────────────────────────────────────────────────────
-interface StoreWithDistance {
-  id: string;
-  name: string;
-  description: string | null;
-  photo_url: string | null;
-  is_open: boolean;
-  latitude: number | null;
-  longitude: number | null;
-  tagline_today: string | null;
-  distance_km: number | null;
-}
+import { Badge } from "@/components/ui/badge";
+import { Navbar } from "@/components/layout/Navbar";
+import { Footer } from "@/components/layout/Footer";
 
-interface UserLocation {
-  lat: number;
-  lng: number;
-  label?: string;
-}
+export const dynamic = "force-dynamic";
 
-// ── Main Component ────────────────────────────────────────────
-export default function BuyerHome() {
-  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
-  const [rawStores, setRawStores] = useState<StoreWithDistance[]>([]);
-  const [isLoadingStores, setIsLoadingStores] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
 
-  const cartTotalItems = useCartStore(s => s.items.reduce((acc, item) => acc + item.quantity, 0));
 
-  // ── On mount: restore saved location ───────────────────────
-  useEffect(() => {
-    const saved = loadSavedLocation();
-    if (saved) setUserLocation(saved);
-    fetchStores();
-  }, []);
-
-  // ── Fetch stores from Supabase ──────────────────────────────
-  const fetchStores = async () => {
-    setIsLoadingStores(true);
-    const { data, error } = await supabase
-      .from("stores")
-      .select("id, name, description, photo_url, is_open, latitude, longitude, tagline_today")
-      .order("is_open", { ascending: false });
-
-    if (!error && data) {
-      setRawStores(data.map(s => ({ ...s, distance_km: null })));
-    }
-    setIsLoadingStores(false);
-  };
-
-  // ── Compute distances when location changes ─────────────────
-  const storesWithDist: StoreWithDistance[] = rawStores.map(store => {
-    if (!userLocation || store.latitude == null || store.longitude == null) {
-      return { ...store, distance_km: null };
-    }
-    return {
-      ...store,
-      distance_km: haversineKm(
-        userLocation.lat, userLocation.lng,
-        store.latitude, store.longitude
-      ),
-    };
-  });
-
-  // Sort: buka dulu, lalu jarak terdekat (null di paling belakang)
-  const sortedStores = [...storesWithDist].sort((a, b) => {
-    if (a.is_open !== b.is_open) return a.is_open ? -1 : 1;
-    if (a.distance_km == null && b.distance_km == null) return 0;
-    if (a.distance_km == null) return 1;
-    if (b.distance_km == null) return -1;
-    return a.distance_km - b.distance_km;
-  });
-
-  // Filter by search query
-  const filteredStores = sortedStores.filter(s =>
-    s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (s.description || "").toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const locationSet = !!userLocation;
+export default async function LandingPage() {
 
   return (
-    <div className="min-h-screen bg-gray-50/50 pb-20">
-      {/* ── Header ── */}
-      <header className="sticky top-0 z-10 bg-white border-b px-4 py-3 shadow-sm">
-        <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
-          <h1 className="text-xl font-bold text-primary tracking-tight">ambilidis</h1>
-          <div className="flex items-center gap-1">
-            <Link href="/orders">
-              <Button variant="ghost" size="icon" className="text-gray-600">
-                <Receipt className="h-6 w-6" />
-              </Button>
-            </Link>
-            <Link href="/checkout">
-              <Button variant="ghost" size="icon" className="relative text-gray-600">
-                <ShoppingBag className="h-6 w-6" />
-                {cartTotalItems > 0 && (
-                  <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                    {cartTotalItems}
-                  </span>
-                )}
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
-
-        {/* ── Location Section ── */}
-        {!locationSet ? (
-          <LocationBanner onLocationSet={setUserLocation} />
-        ) : (
-          <LocationBar
-            location={userLocation!}
-            onClear={() => {
-              setUserLocation(null);
-              clearSavedLocation();
-            }}
-          />
-        )}
-
-        {/* ── Search Bar — disabled saat lokasi belum diset ── */}
-        <div className={`relative transition-all duration-300 ${!locationSet ? "opacity-40 pointer-events-none" : ""}`}>
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-          <Input
-            type="search"
-            placeholder="Cari toko, beras, telur, sayur..."
-            className="w-full pl-10 pr-4 h-12 bg-white rounded-xl shadow-sm border-gray-200 focus-visible:ring-primary"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
-        </div>
-
-        {/* ── Store Grid ── */}
-        <div className={`space-y-4 transition-all duration-300 ${!locationSet ? "opacity-30 pointer-events-none" : ""}`}>
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-gray-900">
-              {locationSet ? "Toko di Sekitarmu" : "Toko Terdekat"}
-            </h2>
-            {locationSet && (
-              <span className="text-xs text-gray-500 font-medium">
-                {filteredStores.filter(s => s.is_open).length} toko buka
-              </span>
-            )}
+    <>
+      <Navbar />
+      <div className="flex flex-col">
+        {/* ── Hero Section ── */}
+        <section className="relative min-h-[90vh] flex items-center pt-20 overflow-hidden">
+          {/* Background blobs */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-full -z-10">
+            <div className="absolute top-1/4 -left-20 w-96 h-96 bg-primary/20 rounded-full blur-[120px] animate-pulse" />
+            <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-amber-200/20 rounded-full blur-[120px]" />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {isLoadingStores ? (
-              /* Skeleton loading menggunakan shadcn <Skeleton /> */
-              Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="rounded-2xl bg-white border shadow-sm overflow-hidden">
-                  <Skeleton className="h-36 w-full rounded-none" />
-                  <div className="p-4 space-y-2">
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-3 w-1/2" />
-                    <Skeleton className="h-3 w-1/3" />
+          <div className="container mx-auto px-4 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div className="space-y-8 text-center lg:text-left">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-bold border border-primary/20 animate-in fade-in slide-in-from-top-4 duration-1000">
+                <Star className="h-4 w-4 fill-primary" />
+                <span>Belanja Tetangga Jadi Mudah</span>
+              </div>
+
+              <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-gray-900 leading-[1.1]">
+                Kebutuhan Harian, <br />
+                <span className="text-primary bg-clip-text">Dekat & Cepat.</span>
+              </h1>
+
+              <p className="text-xl text-gray-600 max-w-xl mx-auto lg:mx-0 leading-relaxed">
+                Beli beras, telur, sayur, dan kebutuhan harian lainnya dari toko sembako terdekat. Dukung ekonomi tetangga, nikmati kemudahan antar.
+              </p>
+
+              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-4">
+                <Link href="/discovery">
+                  <Button size="lg" className="h-14 px-8 text-lg rounded-2xl shadow-xl shadow-primary/20 hover:scale-105 transition-all">
+                    Cari Toko Sekarang
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
+                <Link href="/login">
+                  <Button variant="outline" size="lg" className="h-14 px-8 text-lg rounded-2xl border-2">
+                    Daftarkan Toko Anda
+                  </Button>
+                </Link>
+              </div>
+
+              <div className="flex items-center justify-center lg:justify-start gap-8 pt-8 border-t border-gray-100">
+                <div className="text-center lg:text-left">
+                  <p className="text-2xl font-bold text-gray-900">50+</p>
+                  <p className="text-sm text-gray-500">Toko Lokal</p>
+                </div>
+                <div className="text-center lg:text-left">
+                  <p className="text-2xl font-bold text-gray-900">1000+</p>
+                  <p className="text-sm text-gray-500">Produk Segar</p>
+                </div>
+                <div className="text-center lg:text-left">
+                  <p className="text-2xl font-bold text-gray-900">15 Menit</p>
+                  <p className="text-sm text-gray-500">Rata-rata Antar</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="relative hidden lg:block">
+              <div className="absolute inset-0 bg-linear-to-tr from-primary/10 to-transparent rounded-[3rem] -rotate-3" />
+              <div className="relative bg-white border shadow-2xl rounded-[3rem] p-8 space-y-6 rotate-2 hover:rotate-0 transition-transform duration-500">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600">
+                      <Store className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold">Toko Sembako Berkah</h4>
+                      <p className="text-xs text-gray-400">Jarak: 200m dari lokasimu</p>
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="bg-green-50 text-green-600 border-green-100">BUKA</Badge>
+                </div>
+
+                <div className="space-y-3">
+                  {[
+                    { name: "Beras Cianjur 5kg", price: "Rp 75.000" },
+                    { name: "Telur Ayam 1kg", price: "Rp 28.000" },
+                    { name: "Minyak Goreng 2L", price: "Rp 34.000" },
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                      <span className="text-sm font-medium">{item.name}</span>
+                      <span className="text-sm font-bold text-primary">{item.price}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <Button className="w-full h-12 rounded-xl" disabled>
+                  <ShoppingCart className="mr-2 h-4 w-4" />
+                  Tambah ke Keranjang
+                </Button>
+              </div>
+
+              {/* Floating elements */}
+              <div className="absolute -bottom-6 -left-6 bg-white p-4 shadow-xl rounded-2xl border animate-bounce duration-3000">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 bg-green-500 rounded-full flex items-center justify-center text-white">
+                    <CheckCircle2 className="h-5 w-5" />
+                  </div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Terverifikasi</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Benefits Section ── */}
+        <section className="py-24 bg-white">
+          <div className="container mx-auto px-4">
+            <div className="text-center max-w-2xl mx-auto mb-16 space-y-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Belanja Lebih Pintar, Lebih Dekat</h2>
+              <p className="text-gray-600 italic">"Ambilidis menghubungkan kamu dengan ekosistem lokal terbaik di lingkunganmu."</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[
+                {
+                  icon: <Store className="h-8 w-8" />,
+                  title: "Dukung Toko Lokal",
+                  desc: "Setiap rupiah yang kamu belanjakan mengalir ke tetanggamu sendiri, membantu ekonomi lokal tetap berputar.",
+                  color: "bg-blue-50 text-blue-600"
+                },
+                {
+                  icon: <ShoppingCart className="h-8 w-8" />,
+                  title: "Pesan Tanpa Antri",
+                  desc: "Tak perlu lagi keluar rumah dan mengantri. Pesan semua kebutuhan lewat ponsel, semudah chatting.",
+                  color: "bg-primary/10 text-primary"
+                },
+                {
+                  icon: <Truck className="h-8 w-8" />,
+                  title: "Pengantaran Kilat",
+                  desc: "Karena toko hanya berjarak beberapa meter dari rumahmu, barang sampai lebih cepat dan lebih segar.",
+                  color: "bg-amber-50 text-amber-600"
+                }
+              ].map((feature, i) => (
+                <div key={i} className="p-8 rounded-3xl border border-gray-100 bg-white hover:shadow-xl hover:-translate-y-1 transition-all group">
+                  <div className={`w-16 h-16 ${feature.color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
+                    {feature.icon}
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-3">{feature.title}</h3>
+                  <p className="text-gray-500 leading-relaxed">{feature.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── How it Works ── */}
+        <section className="py-24 bg-gray-50">
+          <div className="container mx-auto px-4">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-12">
+              <div className="md:w-1/2 space-y-6">
+                <h2 className="text-4xl font-bold text-gray-900">Mulai dalam Hitungan Detik</h2>
+                <div className="space-y-8 pt-4">
+                  {[
+                    { step: "01", title: "Atur Lokasi", desc: "Berikan akses lokasi agar kami bisa mencarikan toko yang benar-benar ada di sekitarmu." },
+                    { step: "02", title: "Pilih Toko & Barang", desc: "Lihat katalog harga terbaru dari toko sembako langganan atau cari yang termurah." },
+                    { step: "03", title: "Bayar & Tunggu", desc: "Gunakan transfer bank atau COD. Kurir toko akan segera berangkat ke depan pintumu." }
+                  ].map((item, i) => (
+                    <div key={i} className="flex gap-6">
+                      <span className="text-3xl font-black text-primary/20">{item.step}</span>
+                      <div>
+                        <h4 className="text-lg font-bold text-gray-900 mb-1">{item.title}</h4>
+                        <p className="text-gray-500">{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="md:w-1/2">
+                <div className="aspect-square bg-white rounded-full border-8 border-gray-100 flex items-center justify-center relative shadow-inner">
+                  <Store className="h-32 w-32 text-primary opacity-20" />
+                  <div className="absolute inset-0 flex items-center justify-center p-8">
+                    <p className="text-center text-gray-400 font-medium">Visual Animasi Cara Kerja</p>
                   </div>
                 </div>
-              ))
-            ) : filteredStores.length === 0 ? (
-              /* Empty state menggunakan shadcn <Empty /> */
-              <div className="col-span-full">
-                <Empty className="bg-white border border-dashed py-12">
-                  <EmptyHeader>
-                    <EmptyMedia>🏪</EmptyMedia>
-                    <EmptyTitle>
-                      {searchQuery ? `Toko "${searchQuery}" tidak ditemukan` : "Belum ada toko terdaftar"}
-                    </EmptyTitle>
-                    <EmptyDescription>
-                      {searchQuery ? "Coba kata kunci lain." : "Toko akan muncul di sini setelah mendaftar."}
-                    </EmptyDescription>
-                  </EmptyHeader>
-                </Empty>
               </div>
-            ) : (
-              filteredStores.map(store => (
-                <StoreCard key={store.id} {...store} />
-              ))
-            )}
+            </div>
           </div>
-        </div>
+        </section>
 
-        {/* Hint jika lokasi belum diset */}
-        {!locationSet && !isLoadingStores && (
-          <p className="text-center text-sm text-gray-400 -mt-2">
-            Aktifkan lokasi di atas untuk melihat toko dan jarak terdekat
-          </p>
-        )}
 
-      </main>
-    </div>
+
+        {/* ── CTA Final ── */}
+        <section className="py-24 px-4">
+          <div className="max-w-5xl mx-auto bg-primary rounded-[3rem] p-12 text-center text-white relative overflow-hidden shadow-2xl shadow-primary/40">
+            <div className="absolute top-0 right-0 p-8 opacity-10">
+              <Store className="h-48 w-48 rotate-12" />
+            </div>
+            <h2 className="text-4xl md:text-5xl font-extrabold mb-6 relative">Siap Belanja Tanpa Ribet?</h2>
+            <p className="text-xl text-white/80 mb-10 max-w-2xl mx-auto relative leading-relaxed">
+              Gabung bersama ribuan warga lainnya yang sudah beralih ke cara belanja hyperlocal. Hemat waktu, dukung tetangga.
+            </p>
+            <Link href="/discovery" className="relative inline-block">
+              <Button size="lg" variant="secondary" className="h-16 px-12 text-xl rounded-2xl font-bold shadow-xl hover:scale-105 transition-all">
+                Temukan Toko Terdekat
+              </Button>
+            </Link>
+          </div>
+        </section>
+      </div>
+      <Footer />
+    </>
   );
 }

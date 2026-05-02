@@ -7,4 +7,11 @@ export const createClient = () =>
   createBrowserClient(
     supabaseUrl!,
     supabaseKey!,
+    {
+      cookieOptions: {
+        maxAge: 172800, // 48 jam dalam detik
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+      }
+    }
   );

@@ -1,9 +1,9 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
-import { OrdersPageClient } from "@/components/seller/OrdersPageClient";
+import { ProductsPageClient } from "@/components/seller/ProductsPageClient";
 
-async function getOrdersPageData() {
+async function getProductsPageData() {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
@@ -27,49 +27,33 @@ async function getOrdersPageData() {
 
   const store = stores[0];
 
-  // Fetch orders with items
-  const { data: orders, error: ordersError } = await supabase
-    .from('orders')
-    .select(`
-      id,
-      total_price,
-      status,
-      created_at,
-      updated_at,
-      payment_method,
-      payment_status,
-      buyer_note,
-      rejection_reason,
-      order_items (
-        id,
-        quantity,
-        price,
-        products (name, unit)
-      )
-    `)
+  // Fetch products
+  const { data: products, error: productsError } = await supabase
+    .from('products')
+    .select('id, name, price, unit, is_available, photo_url')
     .eq('store_id', store.id)
     .order('created_at', { ascending: false });
 
-  if (ordersError) {
-    console.error("Orders fetch error:", ordersError);
+  if (productsError) {
+    console.error("Products fetch error:", productsError);
     redirect("/login");
   }
 
   return {
     user,
     store,
-    orders: orders || []
+    products: products || []
   };
 }
 
-export default async function OrdersPage() {
-  const { user, store, orders } = await getOrdersPageData();
+export default async function ProductsPage() {
+  const { user, store, products } = await getProductsPageData();
 
   return (
-    <OrdersPageClient 
+    <ProductsPageClient 
       initialUser={user}
       initialStore={store}
-      initialOrders={orders}
+      initialProducts={products}
     />
   );
 }

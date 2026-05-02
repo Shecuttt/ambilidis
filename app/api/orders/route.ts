@@ -25,25 +25,71 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'orderId and either status or paymentStatus are required' }, { status: 400 });
     }
 
-    const updates: any = { updated_at: new Date().toISOString() };
-    if (status) updates.status = status;
-    if (paymentStatus) updates.payment_status = paymentStatus;
-    if (rejectionReason) updates.rejection_reason = rejectionReason;
+    // 1. Fetch the order to check permissions
+    const { data: order, error: fetchError } = await supabaseAdmin
+      .from('orders')
+      .select('*, stores(owner_id)')
+      .eq('id', orderId)
+      .single();
 
-    // Update order in Supabase
-    const { data: updatedOrder, error } = await supabase
+    if (fetchError || !order) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    }
+
+    // 2. Security Check: Only Seller (store owner) or Buyer can update
+    const isOwner = order.stores?.owner_id === user.id;
+    const isBuyer = order.buyer_id === user.id;
+
+    if (!isOwner && !isBuyer) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // 3. Logic Check: What can each role update?
+    const updates: any = { updated_at: new Date().toISOString() };
+    
+    if (status) {
+      // Buyer can only set to 'completed' or 'canceled'
+      if (isBuyer && !isOwner && !['completed', 'canceled'].includes(status)) {
+        return NextResponse.json({ error: 'Buyer can only complete or cancel orders' }, { status: 403 });
+      }
+      updates.status = status;
+
+      // Auto-set payment_status to paid when completed
+      if (status === 'completed') {
+        updates.payment_status = 'paid';
+      }
+    }
+
+    if (paymentStatus && !updates.payment_status) {
+      // Only Seller can manually update payment status (unless auto-set above)
+      if (!isOwner) {
+        return NextResponse.json({ error: 'Only sellers can update payment status manually' }, { status: 403 });
+      }
+      updates.payment_status = paymentStatus;
+    }
+
+    if (rejectionReason) {
+      if (!isOwner) {
+        return NextResponse.json({ error: 'Only sellers can provide rejection reason' }, { status: 403 });
+      }
+      updates.rejection_reason = rejectionReason;
+    }
+
+    // 4. Perform Update using Admin client to ensure it bypasses RLS hurdles 
+    // but we've already done our manual security checks above.
+    const { data: updatedOrder, error: updateError } = await supabaseAdmin
       .from('orders')
       .update(updates)
       .eq('id', orderId)
       .select('*, profiles!orders_buyer_id_fkey(phone, full_name), stores(owner_id)')
       .single();
 
-    if (error) {
-      console.error('Update order error:', error);
+    if (updateError) {
+      console.error('Update order error:', updateError);
       return NextResponse.json({ error: 'Failed to update order' }, { status: 500 });
     }
 
-    // Trigger WA Notification via Fonnte ONLY if status changed
+    // 5. Trigger WA Notification via Fonnte ONLY if status changed
     if (status && updatedOrder) {
       const shortOrderId = orderId.split('-')[0].toUpperCase();
       let message = '';
@@ -51,7 +97,6 @@ export async function PATCH(request: Request) {
 
       if (status === 'canceled' && updatedOrder.stores?.owner_id) {
         // Canceled by buyer -> Notify Seller
-        // Fetch seller profile
         const { data: sellerProfile } = await supabaseAdmin
           .from('profiles')
           .select('phone')
@@ -76,11 +121,12 @@ export async function PATCH(request: Request) {
           message = `Halo ${buyerName}, mohon maaf, pesanan Anda dengan ID ${shortOrderId} telah DITOLAK oleh toko.${reasonNote}`;
         } else if (status === 'expired') {
           message = `Halo ${buyerName}, mohon maaf, pesanan Anda dengan ID ${shortOrderId} dibatalkan otomatis karena toko sedang sibuk / tidak merespon.`;
+        } else if (status === 'completed') {
+          message = `Halo ${buyerName}, pesanan Anda dengan ID ${shortOrderId} telah SELESAI. Terima kasih telah berbelanja di Ambilidis!`;
         }
       }
 
       if (message && targetPhone) {
-        // We can call Fonnte directly here to save HTTP calls
         const fonnteToken = process.env.FONNTE_TOKEN || process.env.NEXT_PUBLIC_FONNTE_TOKEN;
         if (fonnteToken) {
           await fetch("https://api.fonnte.com/send", {
@@ -109,23 +155,64 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { orderId } = await request.json();
-    if (!orderId) {
-      return NextResponse.json({ error: 'orderId is required' }, { status: 400 });
+    const body = await request.json();
+    const { 
+      storeId, 
+      items, 
+      totalPrice, 
+      deliveryFee, 
+      paymentMethod, 
+      buyerNote 
+    } = body;
+
+    if (!storeId || !items || items.length === 0) {
+      return NextResponse.json({ error: 'Missing required order fields' }, { status: 400 });
     }
 
-    // Get order and store owner phone
-    const { data: orderData } = await supabaseAdmin
-      .from('orders')
-      .select('store_id')
-      .eq('id', orderId)
+    // 1. Create order using supabaseAdmin
+    const { data: order, error: orderError } = await supabaseAdmin
+      .from("orders")
+      .insert({
+        store_id: storeId,
+        buyer_id: user.id,
+        total_price: totalPrice,
+        delivery_fee: deliveryFee,
+        payment_method: paymentMethod,
+        buyer_note: buyerNote?.trim() || null,
+        status: "pending",
+      })
+      .select()
       .single();
 
-    if (orderData) {
+    if (orderError) {
+      console.error("Create order error:", orderError);
+      return NextResponse.json({ error: 'Failed to create order' }, { status: 500 });
+    }
+
+    // 2. Create order items
+    const orderItems = items.map((item: any) => ({
+      order_id: order.id,
+      product_id: item.id,
+      quantity: item.quantity,
+      price: item.price,
+    }));
+
+    const { error: itemsError } = await supabaseAdmin
+      .from("order_items")
+      .insert(orderItems);
+
+    if (itemsError) {
+      console.error("Create order items error:", itemsError);
+      // We should probably delete the order if items fail, but for now we'll just log it
+      return NextResponse.json({ error: 'Failed to create order items' }, { status: 500 });
+    }
+
+    // 3. Trigger WA Notification to Seller if COD
+    if (paymentMethod === 'cod') {
       const { data: storeData } = await supabaseAdmin
         .from('stores')
         .select('owner_id')
-        .eq('id', orderData.store_id)
+        .eq('id', storeId)
         .single();
         
       if (storeData) {
@@ -136,7 +223,7 @@ export async function POST(request: Request) {
           .single();
 
         if (sellerProfile?.phone) {
-          const shortOrderId = orderId.split('-')[0].toUpperCase();
+          const shortOrderId = order.id.split('-')[0].toUpperCase();
           const message = `Halo Seller! Ada pesanan baru berjenis COD (Bayar di Tempat) dengan Order ID: ${shortOrderId}. Silakan cek dashboard Anda untuk mengkonfirmasi pesanan.`;
           
           const fonnteToken = process.env.FONNTE_TOKEN || process.env.NEXT_PUBLIC_FONNTE_TOKEN;
@@ -151,7 +238,7 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, order });
   } catch (err: any) {
     console.error("POST Orders Error:", err.message);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

@@ -17,16 +17,20 @@ import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatRp } from "@/lib/utils";
+import { isStoreWithinHours, formatOperatingHours } from "@/lib/store-utils";
+import { Clock } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────
 interface StoreData {
   id: string;
   name: string;
   description: string | null;
-  photo_url: string | null;
+  logo_url: string | null;
+  banner_url: string | null;
   is_open: boolean;
   tagline_today: string | null;
   address: string | null;
+  operating_hours: any;
 }
 
 interface ProductData {
@@ -84,7 +88,7 @@ export default function StoreDetail({ params }: { params: Promise<{ id: string }
 
     const { data: storeData } = await supabase
       .from("stores")
-      .select("id, name, description, photo_url, is_open, tagline_today, address")
+      .select("id, name, description, logo_url, banner_url, is_open, tagline_today, address, operating_hours")
       .eq("id", id)
       .single();
 
@@ -144,10 +148,10 @@ export default function StoreDetail({ params }: { params: Promise<{ id: string }
 
       {/* ── Wide Store Header ── */}
       <div className="relative w-full h-64 bg-gray-300 overflow-hidden">
-        {store.photo_url ? (
+        {store.banner_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={store.photo_url}
+            src={store.banner_url}
             alt={store.name}
             className="absolute inset-0 w-full h-full object-cover"
           />
@@ -157,7 +161,15 @@ export default function StoreDetail({ params }: { params: Promise<{ id: string }
           </div>
         )}
 
-        <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/20 to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent" />
+
+        {/* Store Logo floating over banner */}
+        {store.logo_url && (
+          <div className="absolute bottom-6 left-5 h-20 w-20 rounded-2xl border-4 border-white shadow-xl overflow-hidden bg-white z-10 translate-y-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={store.logo_url} alt="Logo" className="w-full h-full object-cover" />
+          </div>
+        )}
 
         {/* Back button */}
         <button
@@ -168,7 +180,7 @@ export default function StoreDetail({ params }: { params: Promise<{ id: string }
         </button>
 
         {/* Status badge — shadcn Badge */}
-        <div className="absolute top-4 right-4">
+        <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
           {store.is_open ? (
             <Badge className="bg-green-500 text-white border-transparent gap-1.5 shadow-lg">
               <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
@@ -179,10 +191,16 @@ export default function StoreDetail({ params }: { params: Promise<{ id: string }
               Tutup
             </Badge>
           )}
+          {store.operating_hours && (
+            <div className="bg-black/40 backdrop-blur-sm px-2 py-1 rounded text-[10px] text-white/90 flex items-center gap-1 border border-white/10">
+              <Clock className="h-3 w-3" />
+              {formatOperatingHours(store.operating_hours)}
+            </div>
+          )}
         </div>
 
         {/* Store info overlay */}
-        <div className="absolute bottom-0 left-0 right-0 px-5 pb-5 text-white">
+        <div className={`absolute bottom-0 left-0 right-0 px-5 pb-5 text-white ${store.logo_url ? 'pl-28' : ''}`}>
           <h1 className="text-2xl font-bold drop-shadow-md leading-tight">{store.name}</h1>
           <div className="flex items-center gap-3 mt-1.5 flex-wrap">
             <span className="flex items-center text-white/80 text-xs">

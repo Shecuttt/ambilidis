@@ -1,4 +1,4 @@
-"use client";
+"use client"
 
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, ImagePlus, X, Loader2 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 
@@ -15,6 +19,15 @@ const UNIT_OPTIONS = [
   "ikat", "buah", "pcs",
   "bungkus", "porsi", "liter", "ml", "lusin",
 ];
+
+const productSchema = z.object({
+  name: z.string().min(3, "Nama minimal 3 karakter"),
+  price: z.string().refine((val) => !isNaN(Number(val)) && Number(val) > 0, "Harga harus lebih dari 0"),
+  unit: z.string().min(1, "Satuan wajib diisi"),
+  description: z.string().optional(),
+});
+
+type ProductFormValues = z.infer<typeof productSchema>;
 
 interface AddProductDialogProps {
   storeId: string | null;
@@ -26,10 +39,24 @@ export function AddProductDialog({ storeId, onProductAdded }: AddProductDialogPr
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
-  const [newProduct, setNewProduct] = useState({ name: "", price: "", unit: "kg" });
   const [productPhoto, setProductPhoto] = useState<File | null>(null);
   const [productPhotoPreview, setProductPhotoPreview] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<ProductFormValues>({
+    resolver: zodResolver(productSchema),
+    defaultValues: {
+      name: "",
+      price: "",
+      unit: "kg",
+      description: "",
+    },
+  });
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -50,9 +77,8 @@ export function AddProductDialog({ storeId, onProductAdded }: AddProductDialogPr
     if (photoInputRef.current) photoInputRef.current.value = "";
   };
 
-  const handleAddProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newProduct.name || !newProduct.price || !newProduct.unit || !storeId) return;
+  const onSubmit = async (values: ProductFormValues) => {
+    if (!storeId) return;
 
     setIsSubmitting(true);
     let photoUrl: string | null = null;
@@ -61,20 +87,24 @@ export function AddProductDialog({ storeId, onProductAdded }: AddProductDialogPr
       // 1. Upload foto jika ada
       if (productPhoto) {
         setIsUploadingPhoto(true);
-        const fileExt = productPhoto.name.split('.').pop();
-        const fileName = `${storeId}/${Date.now()}.${fileExt}`;
+        
+        const formData = new FormData();
+        formData.append('file', productPhoto);
+        formData.append('bucket', 'products');
+        formData.append('storeId', storeId);
 
-        const { error: uploadError } = await supabase.storage
-          .from('products')
-          .upload(fileName, productPhoto, { cacheControl: '3600', upsert: false });
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
 
-        if (uploadError) throw new Error(`Gagal upload foto: ${uploadError.message}`);
+        const data = await response.json();
 
-        const { data: urlData } = supabase.storage
-          .from('products')
-          .getPublicUrl(fileName);
+        if (!response.ok) {
+          throw new Error(data.error || 'Gagal upload foto');
+        }
 
-        photoUrl = urlData.publicUrl;
+        photoUrl = data.url;
         setIsUploadingPhoto(false);
       }
 
@@ -83,9 +113,10 @@ export function AddProductDialog({ storeId, onProductAdded }: AddProductDialogPr
         .from('products')
         .insert([{
           store_id: storeId,
-          name: newProduct.name,
-          price: parseInt(newProduct.price),
-          unit: newProduct.unit,
+          name: values.name,
+          price: parseInt(values.price),
+          unit: values.unit,
+          description: values.description,
           is_available: true,
           photo_url: photoUrl,
         }])
@@ -96,7 +127,7 @@ export function AddProductDialog({ storeId, onProductAdded }: AddProductDialogPr
       if (data) {
         onProductAdded(data[0]);
         toast.success("Produk berhasil ditambahkan!");
-        setNewProduct({ name: "", price: "", unit: "kg" });
+        reset();
         clearPhoto();
         setIsOpen(false);
       }
@@ -112,25 +143,27 @@ export function AddProductDialog({ storeId, onProductAdded }: AddProductDialogPr
     <Dialog open={isOpen} onOpenChange={(open) => {
       setIsOpen(open);
       if (!open) {
-        setNewProduct({ name: "", price: "", unit: "kg" });
+        reset();
         clearPhoto();
       }
     }}>
-      <DialogTrigger render={<Button />}>
-        <Plus className="h-4 w-4 mr-2" />
-        Tambah Produk
-      </DialogTrigger>
-      <DialogContent className="max-w-sm">
+      <DialogTrigger render={
+        <Button>
+          <Plus className="h-4 w-4 mr-2" />
+          Tambah Produk
+        </Button>
+      } />
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Tambah Produk Baru</DialogTitle>
           <DialogDescription>Masukkan detail produk yang ingin Anda jual.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleAddProduct} className="space-y-4 py-2">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
           {/* Foto Produk */}
           <div className="space-y-2">
             <Label>Foto Produk <span className="text-xs text-muted-foreground">(maks. 1 MB)</span></Label>
             {productPhotoPreview ? (
-              <div className="relative w-full h-36 rounded-xl overflow-hidden border bg-muted">
+              <div className="relative w-full h-40 rounded-xl overflow-hidden border bg-muted">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={productPhotoPreview} alt="preview" className="w-full h-full object-cover" />
                 <button
@@ -138,16 +171,16 @@ export function AddProductDialog({ storeId, onProductAdded }: AddProductDialogPr
                   onClick={clearPhoto}
                   className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1 hover:bg-black/80 transition"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-4 w-4" />
                 </button>
               </div>
             ) : (
               <button
                 type="button"
                 onClick={() => photoInputRef.current?.click()}
-                className="w-full h-36 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/50 hover:bg-primary/5 transition"
+                className="w-full h-40 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/50 hover:bg-primary/5 transition"
               >
-                <ImagePlus className="h-7 w-7" />
+                <ImagePlus className="h-8 w-8" />
                 <span className="text-sm">Pilih Foto</span>
               </button>
             )}
@@ -162,47 +195,55 @@ export function AddProductDialog({ storeId, onProductAdded }: AddProductDialogPr
 
           {/* Nama */}
           <div className="space-y-1.5">
-            <Label htmlFor="prod-name">Nama Produk</Label>
+            <Label htmlFor="name">Nama Produk</Label>
             <Input
-              id="prod-name"
+              id="name"
               placeholder="Contoh: Gula Pasir"
-              value={newProduct.name}
-              onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-              required
+              {...register("name")}
             />
+            {errors.name && <p className="text-xs text-red-500 font-medium">{errors.name.message}</p>}
+          </div>
+
+          {/* Deskripsi */}
+          <div className="space-y-1.5">
+            <Label htmlFor="description">Deskripsi <span className="text-xs text-muted-foreground">(Opsional)</span></Label>
+            <Textarea
+              id="description"
+              placeholder="Jelaskan detail produk (merek, kualitas, dll)"
+              className="resize-none h-20"
+              {...register("description")}
+            />
+            {errors.description && <p className="text-xs text-red-500 font-medium">{errors.description.message}</p>}
           </div>
 
           {/* Harga + Satuan */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="prod-price">Harga (Rp)</Label>
+              <Label htmlFor="price">Harga (Rp)</Label>
               <Input
-                id="prod-price"
+                id="price"
                 type="number"
-                min="0"
                 placeholder="15000"
-                value={newProduct.price}
-                onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
-                required
+                {...register("price")}
               />
+              {errors.price && <p className="text-xs text-red-500 font-medium">{errors.price.message}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="prod-unit">Satuan</Label>
+              <Label htmlFor="unit">Satuan</Label>
               <NativeSelect
-                id="prod-unit"
-                value={newProduct.unit}
-                onChange={(e) => setNewProduct({ ...newProduct, unit: e.target.value })}
-                required
+                id="unit"
+                {...register("unit")}
                 className="w-full"
               >
                 {UNIT_OPTIONS.map(u => (
                   <NativeSelectOption key={u} value={u}>{u}</NativeSelectOption>
                 ))}
               </NativeSelect>
+              {errors.unit && <p className="text-xs text-red-500 font-medium">{errors.unit.message}</p>}
             </div>
           </div>
 
-          <DialogFooter className="pt-2">
+          <DialogFooter className="pt-4">
             <Button type="submit" disabled={isSubmitting} className="w-full">
               {isSubmitting
                 ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{isUploadingPhoto ? "Mengupload foto..." : "Menyimpan..."}</>

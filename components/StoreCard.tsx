@@ -4,16 +4,20 @@ import { Navigation } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { distanceLabel } from "@/lib/utils";
+import { formatOperatingHours } from "@/lib/store-utils";
+import { Clock } from "lucide-react";
 import Link from "next/link";
 
 interface StoreCardProps {
   id: string;
   name: string;
   description: string | null;
-  photo_url: string | null;
+  logo_url: string | null;
+  banner_url: string | null;
   is_open: boolean;
   tagline_today: string | null;
   distance_km: number | null;
+  operating_hours?: any;
 }
 
 // Placeholder images untuk toko tanpa foto
@@ -31,33 +35,50 @@ function getPlaceholder(id: string) {
 }
 
 export function StoreCard({
-  id, name, description, photo_url,
-  is_open, tagline_today, distance_km,
+  id, name, description, logo_url, banner_url,
+  is_open, tagline_today, distance_km, operating_hours
 }: StoreCardProps) {
   return (
     <Link href={`/store/${id}`}>
       <Card className={`overflow-hidden border-0 shadow-sm hover:shadow-md transition-all cursor-pointer rounded-2xl group h-full ${!is_open ? "grayscale-30" : ""}`}>
         <div className="flex flex-col h-full">
-          {/* ── Foto Toko ── */}
+          {/* ── Banner & Logo ── */}
           <div className="w-full h-36 relative bg-gray-200 shrink-0 overflow-hidden">
+            {/* Banner Background */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={photo_url || getPlaceholder(id)}
+              src={banner_url || getPlaceholder(id)}
               alt={name}
               className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             />
-            {/* Overlay tutup */}
-            {!is_open && (
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center backdrop-blur-[2px]">
-                <span className="text-white text-xs font-bold px-3 py-1 border border-white/50 rounded-md tracking-wider">
-                  TUTUP
-                </span>
+            
+            {/* Logo Overlay */}
+            {logo_url && (
+              <div className="absolute bottom-2 right-2 h-10 w-10 rounded-full border-2 border-white shadow-md overflow-hidden bg-white z-10">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={logo_url} alt="Logo" className="w-full h-full object-cover" />
               </div>
             )}
+
+            {/* Overlay tutup */}
+            {!is_open && (
+              <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center backdrop-blur-[2px] p-2 text-center z-20">
+                <span className="text-white text-xs font-bold px-3 py-1 border border-white/50 rounded-md tracking-wider mb-1">
+                  TUTUP
+                </span>
+                {operating_hours && (
+                  <span className="text-white/80 text-[10px] flex items-center gap-1">
+                    <Clock className="h-2.5 w-2.5" />
+                    Buka: {operating_hours.open}
+                  </span>
+                )}
+              </div>
+            )}
+            
             {/* Badge jarak — pakai shadcn Badge */}
             {distance_km != null && (
               <Badge
-                className="absolute top-2 left-2 bg-black/60 text-white border-transparent text-[10px] gap-1 backdrop-blur-sm hover:bg-black/60"
+                className="absolute top-2 left-2 bg-black/60 text-white border-transparent text-[10px] gap-1 backdrop-blur-sm hover:bg-black/60 z-20"
               >
                 <Navigation className="h-2.5 w-2.5" />
                 {distanceLabel(distance_km)}
