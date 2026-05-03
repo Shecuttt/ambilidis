@@ -16,6 +16,8 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { formatOperatingHours, isStoreWithinHours } from "@/lib/store-utils";
+import { LocationSearch } from "@/components/ui/location-search";
+import { generateSlug } from "@/lib/slug";
 
 interface StoreSettingsProps {
   storeId: string;
@@ -138,10 +140,13 @@ export function StoreSettings({
     if (!storeId || !storeName.trim()) return;
     setIsSavingName(true);
     try {
+      // Generate slug from store name
+      const slug = generateSlug(storeName);
+      
       const res = await fetch('/api/stores', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storeId, name: storeName }),
+        body: JSON.stringify({ storeId, name: storeName, slug }),
       });
       if (!res.ok) throw new Error('Gagal update nama');
       toast.success("Nama toko diperbarui");
@@ -241,6 +246,27 @@ export function StoreSettings({
         setIsGettingLocation(false);
       }
     );
+  };
+
+  const handleLocationSearchSelect = async (location: { lat: number; lng: number; label: string }) => {
+    setIsGettingLocation(true);
+    
+    try {
+      const res = await fetch('/api/stores', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storeId, latitude: location.lat, longitude: location.lng }),
+      });
+      
+      if (!res.ok) throw new Error('Gagal update lokasi');
+      
+      setLocation({ lat: location.lat, lng: location.lng });
+      toast.success(`Lokasi berhasil disimpan: ${location.label}`);
+    } catch (err) {
+      toast.error("Gagal menyimpan lokasi.");
+    } finally {
+      setIsGettingLocation(false);
+    }
   };
 
   const handleSaveOperatingHours = async (newHours: any) => {
@@ -417,22 +443,33 @@ export function StoreSettings({
               </Button>
             </div>
           </div>
-          <div className="flex items-center gap-3 text-sm text-muted-foreground bg-gray-50 p-4 rounded-2xl border">
-            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-              <MapPin className="h-5 w-5 text-primary" />
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Cari Lokasi Toko</Label>
+              <LocationSearch
+                onLocationSelect={handleLocationSearchSelect}
+                placeholder="Cari alamat toko..."
+                disabled={isGettingLocation}
+              />
             </div>
-            <div className="flex-1 truncate">
-              <p className="font-bold text-gray-900 leading-tight">Koordinat GPS</p>
-              <p className="text-xs">
-                {location
-                  ? `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`
-                  : "Lokasi belum diatur"}
-              </p>
+            
+            <div className="flex items-center gap-3 text-sm text-muted-foreground bg-gray-50 p-4 rounded-2xl border">
+              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <MapPin className="h-5 w-5 text-primary" />
+              </div>
+              <div className="flex-1 truncate">
+                <p className="font-bold text-gray-900 leading-tight">Koordinat GPS</p>
+                <p className="text-xs">
+                  {location
+                    ? `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`
+                    : "Lokasi belum diatur"}
+                </p>
+              </div>
+              <Button onClick={handleUpdateLocation} disabled={isGettingLocation} variant="outline" size="sm" className="h-9 rounded-xl px-4 border-primary/20 hover:bg-primary/5 hover:text-primary transition-all">
+                {isGettingLocation ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Edit3 className="h-4 w-4 mr-2" />}
+                GPS
+              </Button>
             </div>
-            <Button onClick={handleUpdateLocation} disabled={isGettingLocation} variant="outline" size="sm" className="h-9 rounded-xl px-4 border-primary/20 hover:bg-primary/5 hover:text-primary transition-all">
-              {isGettingLocation ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Edit3 className="h-4 w-4 mr-2" />}
-              Update
-            </Button>
           </div>
         </div>
 

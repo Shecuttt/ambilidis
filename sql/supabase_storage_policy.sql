@@ -22,7 +22,34 @@ WITH CHECK (
   )
 );
 
--- C. Delete: Hanya Owner Toko yang bisa menghapus foto di foldernya
+-- B. Alternative Policy: Allow upload to any folder in products bucket for authenticated users
+-- This is a fallback policy in case the foldername function doesn't work as expected
+CREATE POLICY "Seller Upload Product Photo Fallback"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (
+  bucket_id = 'products' AND
+  auth.role() = 'authenticated'
+);
+
+-- C. Update: Hanya Owner Toko yang bisa update foto di foldernya
+CREATE POLICY "Seller Update Product Photo"
+ON storage.objects FOR UPDATE
+TO authenticated
+USING (
+  bucket_id = 'products' AND
+  (storage.foldername(name))[1] IN (
+    SELECT id::text FROM stores WHERE owner_id = auth.uid()
+  )
+)
+WITH CHECK (
+  bucket_id = 'products' AND
+  (storage.foldername(name))[1] IN (
+    SELECT id::text FROM stores WHERE owner_id = auth.uid()
+  )
+);
+
+-- D. Delete: Hanya Owner Toko yang bisa menghapus foto di foldernya
 CREATE POLICY "Seller Delete Product Photo"
 ON storage.objects FOR DELETE
 TO authenticated

@@ -43,10 +43,23 @@ export function SellerSidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
+  // Check if user is on setup page
+  const isSetupPage = pathname === "/seller/setup";
+
   const handleLogout = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to logout');
+      }
       
       setShowLogoutDialog(false);
       toast.success("Anda telah berhasil keluar.");
@@ -54,7 +67,7 @@ export function SellerSidebar() {
       router.refresh();
     } catch (error: any) {
       setShowLogoutDialog(false);
-      toast.error("Gagal keluar: " + error.message);
+      toast.error("Gagal keluar: " + (error.message || "Terjadi kesalahan"));
     }
   };
 
@@ -69,50 +82,72 @@ export function SellerSidebar() {
             ambilidis
           </span>
         </Link>
-        <p className="text-[10px] text-muted-foreground mt-1 font-medium uppercase tracking-widest">Seller Center</p>
+        <p className="text-[10px] text-muted-foreground mt-1 font-medium uppercase tracking-widest">
+          {isSetupPage ? "Onboarding" : "Seller Center"}
+        </p>
       </div>
 
-      <nav className="flex-1 px-4 space-y-1">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href || (item.href.includes('#') && pathname === item.href.split('#')[0]);
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              onClick={() => setIsOpen(false)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${isActive
-                  ? "bg-primary/10 text-primary shadow-sm"
-                  : "text-muted-foreground hover:bg-gray-50 hover:text-foreground"
-                }`}
-            >
-              <item.icon className={`h-5 w-5 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
-              {item.name}
-            </Link>
-          );
-        })}
-      </nav>
-
-      <div className="p-4 border-t mt-auto space-y-2">
-        <div className="bg-gray-50 rounded-xl p-3 flex items-center gap-3">
-          <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs">
-            S
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-bold truncate">Seller Account</p>
-            <p className="text-[10px] text-muted-foreground truncate">Verified Shop</p>
+      {isSetupPage ? (
+        // Setup page - show onboarding message
+        <div className="flex-1 px-6 flex items-center">
+          <div className="text-center space-y-3">
+            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+              <Store className="h-8 w-8 text-primary" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-semibold text-foreground">Setup Toko</h3>
+              <p className="text-sm text-muted-foreground">
+                Lengkapi informasi toko Anda untuk memulai berjualan
+              </p>
+            </div>
           </div>
         </div>
-        
-        <Button
-          onClick={() => setShowLogoutDialog(true)}
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start text-muted-foreground hover:text-red-600 hover:bg-red-50"
-        >
-          <LogOut className="h-4 w-4 mr-2" />
-          Logout
-        </Button>
-      </div>
+      ) : (
+        // Normal navigation
+        <>
+          <nav className="flex-1 px-4 space-y-1">
+            {navItems.map((item) => {
+              const isActive = pathname === item.href || (item.href.includes('#') && pathname === item.href.split('#')[0]);
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  onClick={() => setIsOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${isActive
+                      ? "bg-primary/10 text-primary shadow-sm"
+                      : "text-muted-foreground hover:bg-gray-50 hover:text-foreground"
+                    }`}
+                >
+                  <item.icon className={`h-5 w-5 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
+                  {item.name}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="p-4 border-t mt-auto space-y-2">
+            <div className="bg-gray-50 rounded-xl p-3 flex items-center gap-3">
+              <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs">
+                S
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold truncate">Seller Account</p>
+                <p className="text-[10px] text-muted-foreground truncate">Verified Shop</p>
+              </div>
+            </div>
+            
+            <Button
+              onClick={() => setShowLogoutDialog(true)}
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start text-muted-foreground hover:text-red-600 hover:bg-red-50"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </div>
+        </>
+      )}
     </div>
   );
 

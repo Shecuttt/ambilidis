@@ -47,7 +47,7 @@ export default async function LandingPage() {
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
-                <Link href="/login">
+                <Link href="/seller/setup">
                   <Button variant="outline" size="lg" className="h-14 px-8 text-lg rounded-2xl border-2">
                     Daftarkan Toko Anda
                   </Button>

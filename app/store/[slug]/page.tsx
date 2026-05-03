@@ -17,7 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatRp } from "@/lib/utils";
-import { isStoreWithinHours, formatOperatingHours } from "@/lib/store-utils";
+import { formatOperatingHours } from "@/lib/store-utils";
 import { Clock } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────
@@ -44,9 +44,9 @@ interface ProductData {
 }
 
 // ── Main Component ───────────────────────────────────────────
-export default function StoreDetail({ params }: { params: Promise<{ id: string }> }) {
+export default function StoreDetail({ params }: { params: Promise<{ slug: string }> }) {
   const router = useRouter();
-  const { id } = use(params);
+  const { slug } = use(params);
 
   const [store, setStore] = useState<StoreData | null>(null);
   const [products, setProducts] = useState<ProductData[]>([]);
@@ -81,7 +81,7 @@ export default function StoreDetail({ params }: { params: Promise<{ id: string }
   useEffect(() => {
     fetchStoreAndProducts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [slug]);
 
   const fetchStoreAndProducts = async () => {
     setIsLoading(true);
@@ -89,7 +89,7 @@ export default function StoreDetail({ params }: { params: Promise<{ id: string }
     const { data: storeData } = await supabase
       .from("stores")
       .select("id, name, description, logo_url, banner_url, is_open, tagline_today, address, operating_hours")
-      .eq("id", id)
+      .eq("slug", slug)
       .single();
 
     if (storeData) {
@@ -98,7 +98,7 @@ export default function StoreDetail({ params }: { params: Promise<{ id: string }
       const { data: productsData } = await supabase
         .from("products")
         .select("id, name, description, price, unit, photo_url, is_available")
-        .eq("store_id", id)
+        .eq("store_id", storeData.id)
         .order("is_available", { ascending: false })
         .order("name");
 
@@ -285,7 +285,7 @@ export default function StoreDetail({ params }: { params: Promise<{ id: string }
       </div>
 
       {/* ── Floating Cart Button ── */}
-      {cartTotalItems > 0 && cartStoreId === id && (
+      {cartTotalItems > 0 && cartStoreId === store?.id && (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-linear-to-t from-white via-white to-transparent pb-6 z-30">
           <div className="max-w-4xl mx-auto">
             <Link href="/checkout">

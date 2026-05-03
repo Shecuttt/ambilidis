@@ -22,6 +22,7 @@ import { toast } from "sonner";
 
 // Sub-components
 import { CheckoutSummary } from "@/components/checkout/CheckoutSummary";
+import { LocationSearch } from "@/components/ui/location-search";
 
 // ── Delivery fee constants ────────────────────────────────────
 const DELIVERY_RATE_PER_KM = 2000; // Rp per km
@@ -53,13 +54,52 @@ export function CheckoutPageClient({ initialUser }: CheckoutPageClientProps) {
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
   const [deliveryFee, setDeliveryFee] = useState(MIN_DELIVERY_FEE);
   const [isCalcingDist, setIsCalcingDist] = useState(false);
+  const [storeInfo, setStoreInfo] = useState<any>(null);
 
   const total = getTotal();
   const grandTotal = total + deliveryFee;
 
-  // ── Load buyer location from sessionStorage & fetch store coords ──
+  // ── Load profile address & buyer location from sessionStorage & fetch store coords ──
   useEffect(() => {
     if (!storeId || items.length === 0) return;
+
+    // Load user profile address
+    const loadProfileAddress = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('address')
+          .eq('id', initialUser.id)
+          .single();
+
+        if (!error && data?.address && data.address !== 'Alamat belum diatur') {
+          setAddress(data.address);
+        }
+      } catch (error) {
+        console.error('Error loading profile address:', error);
+      }
+    };
+
+    loadProfileAddress();
+
+    // Load store information
+    const loadStoreInfo = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('stores')
+          .select('id, name, slug')
+          .eq('id', storeId)
+          .single();
+
+        if (!error && data) {
+          setStoreInfo(data);
+        }
+      } catch (error) {
+        console.error('Error loading store info:', error);
+      }
+    };
+
+    loadStoreInfo();
     
     const calcDistance = async () => {
       setIsCalcingDist(true);
@@ -291,15 +331,70 @@ export function CheckoutPageClient({ initialUser }: CheckoutPageClientProps) {
                   <h3 className="font-semibold">Alamat Pengiriman</h3>
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="address">Alamat Lengkap</Label>
-                  <Textarea
-                    id="address"
-                    placeholder="Masukkan alamat pengiriman lengkap..."
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    rows={3}
-                  />
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Alamat Lengkap</Label>
+                    <Textarea
+                      id="address"
+                      placeholder="Masukkan alamat pengiriman lengkap..."
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      rows={3}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Cari Lokasi Pengiriman</Label>
+                    <LocationSearch
+                      onLocationSelect={async (location) => {
+                        // Update address dengan lokasi yang dipilih
+                        setAddress(location.label);
+                        
+                        // Save to profile database
+                        try {
+                          const { error } = await supabase
+                            .from('profiles')
+                            .upsert({
+                              id: initialUser.id,
+                              address: location.label,
+                              location: `POINT(${location.lng} ${location.lat})`,
+                            });
+
+                          if (!error) {
+                            toast.success('Lokasi berhasil disimpan ke profil');
+                          }
+                        } catch (error) {
+                          console.error('Error saving location to profile:', error);
+                        }
+
+                        // Update sessionStorage untuk distance calculation
+                        const buyerLoc = { lat: location.lat, lng: location.lng };
+                        sessionStorage.setItem("ambilidis_buyer_location", JSON.stringify(buyerLoc));
+                        
+                        // Recalculate distance
+                        if (storeId) {
+                          const { data } = await supabase
+                            .from("stores")
+                            .select("latitude, longitude")
+                            .eq("id", storeId)
+                            .single();
+
+                          if (data?.latitude && data?.longitude) {
+                            const dist = haversineKm(
+                              location.lat,
+                              location.lng,
+                              data.latitude,
+                              data.longitude
+                            );
+                            const fee = calcDeliveryFee(dist);
+                            setDistanceKm(dist);
+                            setDeliveryFee(fee);
+                          }
+                        }
+                      }}
+                      placeholder="Cari alamat pengiriman..."
+                    />
+                  </div>
                 </div>
 
                 {distanceKm !== null && (
@@ -379,7 +474,18 @@ export function CheckoutPageClient({ initialUser }: CheckoutPageClientProps) {
           <div className="space-y-6">
             <Card className="sticky top-4">
               <CardContent className="pt-6">
-                <h3 className="font-semibold mb-4">Ringkasan Pembayaran</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold">Ringkasan Pembayaran</h3>
+                  {storeInfo && (
+                    <Link 
+                      href={`/store/${storeInfo.slug || storeInfo.id}`}
+                      className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                    >
+                      <ArrowLeft className="h-3 w-3" />
+                      Kembali ke {storeInfo.name}
+                    </Link>
+                  )}
+                </div>
                 
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm">

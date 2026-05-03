@@ -28,24 +28,9 @@ async function getSellerDashboardData() {
 
   let store = stores?.[0];
 
-  // Create store if not exists
+  // Redirect to setup store if seller doesn't have a store yet
   if (!store) {
-    const { data: newStore, error: createError } = await supabase
-      .from('stores')
-      .insert([{ 
-        owner_id: user.id, 
-        name: "Toko Baru", 
-        is_open: false 
-      }])
-      .select()
-      .single();
-
-    if (createError) {
-      console.error("Store creation error:", createError);
-      redirect("/login");
-    }
-
-    store = newStore;
+    redirect("/seller/setup");
   }
 
   // Sync Store Status based on Operating Hours

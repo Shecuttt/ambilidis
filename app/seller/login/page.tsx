@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { supabase } from "@/lib/supabase";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
-import { ShoppingBag, Loader2 } from "lucide-react";
+import { Store, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 const authSchema = z.object({
@@ -24,9 +24,8 @@ const authSchema = z.object({
 
 type AuthFormValues = z.infer<typeof authSchema>;
 
-export default function BuyerLoginPage() {
+export default function SellerLoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [isSignUp, setIsSignUp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -63,7 +62,7 @@ export default function BuyerLoginPage() {
           options: {
             data: {
               full_name: data.fullName,
-              role: "buyer",
+              role: "seller",
             },
           },
         });
@@ -87,7 +86,7 @@ export default function BuyerLoginPage() {
             .from('profiles')
             .upsert({
               id: authData.user.id,
-              role: 'buyer',
+              role: 'seller',
             });
 
           if (profileError) throw profileError;
@@ -96,14 +95,11 @@ export default function BuyerLoginPage() {
         // Show welcome toast with user's full name
         const userMetadata = authData.user?.user_metadata || {};
         const fullName = userMetadata.full_name || authData.user?.email?.split('@')[0] || data.email;
-        console.log('User metadata:', userMetadata, 'Full name:', fullName);
+        console.log('Seller login - User metadata:', userMetadata, 'Full name:', fullName);
         toast.success(`Selamat datang, ${fullName}!`);
 
-        // Get redirect URL from search params or default to home
-        const redirectTo = searchParams.get('redirect') || '/';
-        
-        // Redirect to previous page or home
-        router.push(redirectTo);
+        // Redirect to dashboard on success
+        router.push("/seller/dashboard");
         router.refresh();
       }
     } catch (error: any) {
@@ -120,14 +116,14 @@ export default function BuyerLoginPage() {
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
             <div className="p-3 bg-primary/10 rounded-full">
-              <ShoppingBag className="h-8 w-8 text-primary" />
+              <Store className="h-8 w-8 text-primary" />
             </div>
           </div>
           <CardTitle className="text-2xl font-bold tracking-tight text-primary">
             ambilidis
           </CardTitle>
           <CardDescription>
-            {isSignUp ? "Buat akun baru untuk mulai berbelanja." : "Masuk ke akun Anda."}
+            {isSignUp ? "Buat akun baru untuk mulai berjualan." : "Masuk ke akun toko Anda."}
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { isStoreWithinHours } from "@/lib/store-utils";
+import { useCartStore } from "@/lib/store";
 
 // Sub-components
 import { DashboardStats } from "@/components/seller/DashboardStats";
@@ -33,12 +34,18 @@ export function SellerDashboardClient({
   initialStats 
 }: SellerDashboardClientProps) {
   const router = useRouter();
+  const clearCart = useCartStore(s => s.clearCart);
   const [isOpen, setIsOpen] = useState(initialStore?.is_open || false);
   const [storeData, setStoreData] = useState(initialStore);
   const [isLoading, setIsLoading] = useState(false);
   
   // Dashboard stats
   const [stats, setStats] = useState(initialStats);
+
+  // Clear cart when seller dashboard loads (sellers shouldn't have buyer cart)
+  useEffect(() => {
+    clearCart();
+  }, [clearCart]);
 
   useEffect(() => {
     // Periksa jam operasional saat pertama kali load

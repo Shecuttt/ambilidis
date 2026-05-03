@@ -21,8 +21,13 @@ async function getOrdersPageData() {
     .eq('owner_id', user.id)
     .limit(1);
 
-  if (storeError || !stores?.[0]) {
+  if (storeError) {
     redirect("/login");
+  }
+
+  // Redirect to setup if seller doesn't have a store yet
+  if (!stores?.[0]) {
+    redirect("/seller/setup");
   }
 
   const store = stores[0];

@@ -11,7 +11,7 @@ async function getOrdersPageData() {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   
   if (authError || !user) {
-    redirect("/login");
+    redirect("/login?redirect=/orders");
   }
 
   // Fetch buyer orders with ratings

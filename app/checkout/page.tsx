@@ -11,7 +11,7 @@ async function getCheckoutPageData() {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   
   if (authError || !user) {
-    redirect("/login");
+    redirect("/login?redirect=/checkout");
   }
 
   return {

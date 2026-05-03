@@ -10,6 +10,7 @@ import Link from "next/link";
 
 interface StoreCardProps {
   id: string;
+  slug: string;
   name: string;
   description: string | null;
   logo_url: string | null;
@@ -35,11 +36,11 @@ function getPlaceholder(id: string) {
 }
 
 export function StoreCard({
-  id, name, description, logo_url, banner_url,
+  id, slug, name, description, logo_url, banner_url,
   is_open, tagline_today, distance_km, operating_hours
 }: StoreCardProps) {
   return (
-    <Link href={`/store/${id}`}>
+    <Link href={`/store/${slug}`}>
       <Card className={`overflow-hidden border-0 shadow-sm hover:shadow-md transition-all cursor-pointer rounded-2xl group h-full ${!is_open ? "grayscale-30" : ""}`}>
         <div className="flex flex-col h-full">
           {/* ── Banner & Logo ── */}

@@ -1,9 +1,9 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
-import { SettingsPageClient } from "@/components/seller/SettingsPageClient";
+import { SellerSetupClient } from "@/components/seller/SellerSetupClient";
 
-async function getSettingsPageData() {
+async function getSellerSetupData() {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
@@ -14,7 +14,7 @@ async function getSettingsPageData() {
     redirect("/login");
   }
 
-  // Fetch store
+  // Check if user already has a store
   const { data: stores, error: storeError } = await supabase
     .from('stores')
     .select('*')
@@ -22,29 +22,20 @@ async function getSettingsPageData() {
     .limit(1);
 
   if (storeError) {
+    console.error("Store fetch error:", storeError);
     redirect("/login");
   }
 
-  // Redirect to setup if seller doesn't have a store yet
-  if (!stores?.[0]) {
-    redirect("/seller/setup");
+  // If user already has a store, redirect to dashboard
+  if (stores && stores.length > 0) {
+    redirect("/seller/dashboard");
   }
 
-  const store = stores[0];
-
-  return {
-    user,
-    store
-  };
+  return { user };
 }
 
-export default async function SettingsPage() {
-  const { user, store } = await getSettingsPageData();
+export default async function SellerSetupPage() {
+  const { user } = await getSellerSetupData();
 
-  return (
-    <SettingsPageClient 
-      initialUser={user}
-      initialStore={store}
-    />
-  );
+  return <SellerSetupClient user={user} />;
 }

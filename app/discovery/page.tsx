@@ -15,6 +15,7 @@ import { Footer } from "@/components/layout/Footer";
 // ── Types ─────────────────────────────────────────────────────
 interface StoreWithDistance {
   id: string;
+  slug: string;
   name: string;
   description: string | null;
   is_open: boolean;
@@ -53,7 +54,7 @@ export default function DiscoveryPage() {
     setIsLoadingStores(true);
     const { data, error } = await supabase
       .from("stores")
-      .select("id, name, description, is_open, latitude, longitude, tagline_today, operating_hours, logo_url, banner_url")
+      .select("id, slug, name, description, is_open, latitude, longitude, tagline_today, operating_hours, logo_url, banner_url")
       .order("is_open", { ascending: false });
 
     if (!error && data) {

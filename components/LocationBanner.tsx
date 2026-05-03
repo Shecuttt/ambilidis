@@ -5,6 +5,9 @@ import { MapPin, Navigation, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { LocationSearch } from "@/components/ui/location-search";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
 
 interface UserLocation {
   lat: number;
@@ -36,6 +39,34 @@ export function clearSavedLocation() {
   try { sessionStorage.removeItem(LOC_KEY); } catch { /* ignore */ }
 }
 
+// Save location to user profile in database
+export async function saveLocationToProfile(location: UserLocation) {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      console.log('No authenticated user, skipping profile save');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .upsert({
+        id: user.id,
+        address: location.label || 'Lokasi pengguna',
+        location: `POINT(${location.lng} ${location.lat})`, // PostGIS POINT format: longitude latitude
+      });
+
+    if (error) {
+      console.error('Error saving location to profile:', error);
+    } else {
+      console.log('Location saved to profile successfully');
+    }
+  } catch (error) {
+    console.error('Error in saveLocationToProfile:', error);
+  }
+}
+
 /**
  * LocationBanner — Ditampilkan saat lokasi buyer belum diset.
  * Mendukung GPS (navigator.geolocation) dan input koordinat manual sebagai fallback.
@@ -57,7 +88,7 @@ export function LocationBanner({ onLocationSet }: LocationBannerProps) {
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const loc: UserLocation = {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
@@ -65,6 +96,8 @@ export function LocationBanner({ onLocationSet }: LocationBannerProps) {
         };
         saveLocation(loc);
         onLocationSet(loc);
+        // Save to profile database
+        await saveLocationToProfile(loc);
         setIsGettingGPS(false);
       },
       () => {
@@ -76,7 +109,7 @@ export function LocationBanner({ onLocationSet }: LocationBannerProps) {
     );
   };
 
-  const handleManualSubmit = (e: React.FormEvent) => {
+  const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const lat = parseFloat(manualLat);
     const lng = parseFloat(manualLng);
@@ -87,6 +120,8 @@ export function LocationBanner({ onLocationSet }: LocationBannerProps) {
     const loc: UserLocation = { lat, lng, label: "Manual" };
     saveLocation(loc);
     onLocationSet(loc);
+    // Save to profile database
+    await saveLocationToProfile(loc);
   };
 
   return (
@@ -137,30 +172,26 @@ export function LocationBanner({ onLocationSet }: LocationBannerProps) {
             )}
           </div>
         ) : (
-          /* Manual coordinate input */
-          <form onSubmit={handleManualSubmit} className="max-w-xs mx-auto space-y-3">
+          /* Location search input */
+          <div className="max-w-xs mx-auto space-y-3">
             <p className="text-white/80 text-xs">
-              Masukkan koordinat lokasi kamu. Cek di Google Maps → klik lokasi → lihat angka lat,lng di URL.
+              Cari alamat atau lokasi yang kamu inginkan.
             </p>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Latitude (-6.2)"
-                value={manualLat}
-                onChange={e => setManualLat(e.target.value)}
-                className="bg-white/10 border-white/30 text-white placeholder:text-white/50 focus-visible:ring-white"
-                required
-              />
-              <Input
-                placeholder="Longitude (106.8)"
-                value={manualLng}
-                onChange={e => setManualLng(e.target.value)}
-                className="bg-white/10 border-white/30 text-white placeholder:text-white/50 focus-visible:ring-white"
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full rounded-xl bg-white text-primary hover:bg-white/90">
-              Pakai Lokasi Ini
-            </Button>
+            <LocationSearch
+              onLocationSelect={async (location) => {
+                const loc: UserLocation = {
+                  lat: location.lat,
+                  lng: location.lng,
+                  label: location.label
+                };
+                saveLocation(loc);
+                onLocationSet(loc);
+                // Save to profile database
+                await saveLocationToProfile(loc);
+              }}
+              placeholder="Cari alamat atau lokasi..."
+              className="w-full"
+            />
             <button
               type="button"
               onClick={() => setShowManual(false)}
@@ -168,7 +199,7 @@ export function LocationBanner({ onLocationSet }: LocationBannerProps) {
             >
               ← Kembali ke GPS
             </button>
-          </form>
+          </div>
         )}
       </div>
     </div>

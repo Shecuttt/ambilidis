@@ -6,14 +6,20 @@ CREATE TABLE profiles (
   id UUID REFERENCES auth.users(id) PRIMARY KEY,
   full_name TEXT,
   role TEXT CHECK (role IN ('seller', 'buyer')),
+  address TEXT,
+  location GEOGRAPHY(POINT, 4326),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Index for fast location-based queries on profiles
+CREATE INDEX profiles_location_idx ON profiles USING GIST (location);
 
 -- 2. Stores Table
 CREATE TABLE stores (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id UUID REFERENCES profiles(id) NOT NULL,
   name TEXT NOT NULL,
+  slug TEXT UNIQUE,
   description TEXT,
   photo_url TEXT,
   location GEOGRAPHY(POINT, 4326), -- PostGIS point for [longitude, latitude]
@@ -24,6 +30,8 @@ CREATE TABLE stores (
 
 -- Index for fast nearest neighbor search
 CREATE INDEX stores_location_idx ON stores USING GIST (location);
+-- Unique index for slug
+CREATE UNIQUE INDEX stores_slug_idx ON stores (slug);
 
 -- 3. Products Table
 CREATE TABLE products (
@@ -67,12 +75,21 @@ ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
 
 -- Basic Policies (can be refined later)
+-- Users can manage their own profile
+CREATE POLICY "Users can view their own profile" ON profiles FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "Users can insert their own profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
+CREATE POLICY "Users can update their own profile" ON profiles FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
+CREATE POLICY "Users can delete their own profile" ON profiles FOR DELETE USING (auth.uid() = id);
+
 -- Public read access to stores and products
-CREATE POLICY "Public stores are viewable by everyone." ON stores FOR SELECT USING (true);
+CREATE POLICY "Open stores are viewable by everyone." ON stores FOR SELECT USING (is_open = true);
+CREATE POLICY "Sellers can view their own stores." ON stores FOR SELECT USING (auth.uid() = owner_id);
 CREATE POLICY "Public products are viewable by everyone." ON products FOR SELECT USING (true);
 
 -- Sellers can manage their own store and products
-CREATE POLICY "Users can manage their own store." ON stores FOR ALL USING (auth.uid() = owner_id);
+CREATE POLICY "Users can manage their own store." ON stores FOR UPDATE USING (auth.uid() = owner_id);
+CREATE POLICY "Users can delete their own store." ON stores FOR DELETE USING (auth.uid() = owner_id);
+CREATE POLICY "Sellers can create stores." ON stores FOR INSERT WITH CHECK (auth.uid() = owner_id);
 CREATE POLICY "Users can manage their store's products." ON products FOR ALL USING (
   EXISTS (SELECT 1 FROM stores WHERE stores.id = products.store_id AND stores.owner_id = auth.uid())
 );
