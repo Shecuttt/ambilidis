@@ -42,13 +42,6 @@ export default function DiscoveryPage() {
   const [isLoadingStores, setIsLoadingStores] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // ── On mount: restore saved location ───────────────────────
-  useEffect(() => {
-    const saved = loadSavedLocation();
-    if (saved) setUserLocation(saved);
-    fetchStores();
-  }, []);
-
   // ── Fetch stores from Supabase ──────────────────────────────
   const fetchStores = async () => {
     setIsLoadingStores(true);
@@ -62,6 +55,13 @@ export default function DiscoveryPage() {
     }
     setIsLoadingStores(false);
   };
+
+  // ── On mount: restore saved location ───────────────────────
+  useEffect(() => {
+    const saved = loadSavedLocation();
+    if (saved) setTimeout(() => setUserLocation(saved), 0);
+    setTimeout(() => fetchStores(), 0);
+  }, []);
 
   // ── Compute distances when location changes ─────────────────
   const storesWithDist: StoreWithDistance[] = rawStores.map(store => {
@@ -104,7 +104,7 @@ export default function DiscoveryPage() {
   return (
     <>
       <Navbar />
-      <div className="min-h-screen bg-gray-50/50 pb-20">
+      <div className="min-h-screen bg-background pb-20">
         <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
 
           {/* ── Location Section ── */}
@@ -122,11 +122,11 @@ export default function DiscoveryPage() {
 
           {/* ── Search Bar — disabled saat lokasi belum diset ── */}
           <div className={`relative transition-all duration-300 ${!locationSet ? "opacity-40 pointer-events-none" : ""}`}>
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
               type="search"
               placeholder="Cari toko, beras, telur, sayur..."
-              className="w-full pl-10 pr-4 h-12 bg-white rounded-xl shadow-sm border-gray-200 focus-visible:ring-primary"
+              className="w-full pl-10 pr-4 h-12 bg-card rounded-xl shadow-sm border-border focus-visible:ring-primary"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
             />
@@ -135,11 +135,11 @@ export default function DiscoveryPage() {
           {/* ── Store Grid ── */}
           <div className={`space-y-4 transition-all duration-300 ${!locationSet ? "opacity-30 pointer-events-none" : ""}`}>
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">
+              <h2 className="text-xl font-bold text-foreground">
                 {locationSet ? "Toko di Sekitarmu" : "Toko Terdekat"}
               </h2>
               {locationSet && (
-                <span className="text-xs text-gray-500 font-medium">
+                <span className="text-xs text-muted-foreground font-medium">
                   Radius {MAX_SERVICE_DISTANCE}km • {filteredStores.filter(s => s.is_open).length} toko buka
                 </span>
               )}
@@ -148,7 +148,7 @@ export default function DiscoveryPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {isLoadingStores ? (
                 Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="rounded-2xl bg-white border shadow-sm overflow-hidden">
+                  <div key={i} className="rounded-2xl bg-card border shadow-sm overflow-hidden">
                     <Skeleton className="h-36 w-full rounded-none" />
                     <div className="p-4 space-y-2">
                       <Skeleton className="h-4 w-3/4" />
@@ -159,7 +159,7 @@ export default function DiscoveryPage() {
                 ))
               ) : filteredStores.length === 0 ? (
                 <div className="col-span-full">
-                  <Empty className="bg-white border border-dashed py-12">
+                  <Empty className="bg-card border border-dashed py-12">
                     <EmptyHeader>
                       <EmptyMedia>📍</EmptyMedia>
                       <EmptyTitle>
@@ -189,7 +189,7 @@ export default function DiscoveryPage() {
 
           {/* Hint jika lokasi belum diset */}
           {!locationSet && !isLoadingStores && (
-            <p className="text-center text-sm text-gray-400 -mt-2">
+            <p className="text-center text-sm text-muted-foreground -mt-2">
               Aktifkan lokasi di atas untuk melihat toko dalam jangkauan {MAX_SERVICE_DISTANCE}km
             </p>
           )}

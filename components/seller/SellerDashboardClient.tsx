@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -47,10 +47,50 @@ export function SellerDashboardClient({
     clearCart();
   }, [clearCart]);
 
+  const checkAndTriggerIsOpen = useCallback(async (sid: string, hours: any, currentStatus: boolean) => {
+    if (!hours) return;
+    const shouldBeOpen = isStoreWithinHours(hours);
+
+    if (shouldBeOpen !== currentStatus) {
+      try {
+        const res = await fetch('/api/stores', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ storeId: sid, is_open: shouldBeOpen }),
+        });
+        if (res.ok) setIsOpen(shouldBeOpen);
+      } catch (err) {
+        console.error("Failed to auto-update store status:", err);
+      }
+    }
+  }, []);
+
+  const handleToggleOpen = async (newStatus: boolean) => {
+    const previousStatus = isOpen;
+    setIsOpen(newStatus);
+    
+    try {
+      const res = await fetch('/api/stores', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storeId: storeData.id, is_open: newStatus }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Gagal update status");
+      }
+
+      toast.success(newStatus ? "Toko dibuka" : "Toko ditutup");
+    } catch (err) {
+      setIsOpen(previousStatus);
+      toast.error("Gagal mengubah status toko.");
+    }
+  };
+
   useEffect(() => {
     // Periksa jam operasional saat pertama kali load
     if (storeData?.id && storeData?.operating_hours) {
-      checkAndTriggerIsOpen(storeData.id, storeData.operating_hours, storeData.is_open);
+      setTimeout(() => checkAndTriggerIsOpen(storeData.id, storeData.operating_hours, storeData.is_open), 0);
     }
 
     // Real-time updates untuk toggle status toko
@@ -76,47 +116,7 @@ export function SellerDashboardClient({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [storeData?.id]);
-
-  const checkAndTriggerIsOpen = async (sid: string, hours: any, currentStatus: boolean) => {
-    if (!hours) return;
-    const shouldBeOpen = isStoreWithinHours(hours);
-
-    if (shouldBeOpen !== currentStatus) {
-      try {
-        const res = await fetch('/api/stores', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ storeId: sid, is_open: shouldBeOpen }),
-        });
-        if (res.ok) setIsOpen(shouldBeOpen);
-      } catch (err) {
-        console.error("Failed to auto-update store status:", err);
-      }
-    }
-  };
-
-  const handleToggleOpen = async (newStatus: boolean) => {
-    const previousStatus = isOpen;
-    setIsOpen(newStatus);
-    
-    try {
-      const res = await fetch('/api/stores', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storeId: storeData.id, is_open: newStatus }),
-      });
-
-      if (!res.ok) {
-        throw new Error("Gagal update status");
-      }
-
-      toast.success(newStatus ? "Toko dibuka" : "Toko ditutup");
-    } catch (err) {
-      setIsOpen(previousStatus);
-      toast.error("Gagal mengubah status toko.");
-    }
-  };
+  }, [storeData?.id, storeData?.operating_hours, storeData?.is_open, checkAndTriggerIsOpen]);
 
   if (isLoading) {
     return (

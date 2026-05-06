@@ -19,8 +19,6 @@ interface LocationBannerProps {
   onLocationSet: (loc: UserLocation) => void;
 }
 
-const BG_IMAGE =
-  "https://images.unsplash.com/photo-1604719312566-8912e9227c6a?auto=format&fit=crop&q=80&w=800";
 
 const LOC_KEY = "ambilidis_buyer_location";
 
@@ -43,7 +41,7 @@ export function clearSavedLocation() {
 export async function saveLocationToProfile(location: UserLocation) {
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     if (!user) {
       console.log('No authenticated user, skipping profile save');
       return;
@@ -68,6 +66,28 @@ export async function saveLocationToProfile(location: UserLocation) {
 }
 
 /**
+ * Mengambil alamat (display_name) dari koordinat menggunakan Nominatim API (OpenStreetMap).
+ */
+async function getAddressFromCoords(lat: number, lng: number): Promise<string | null> {
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+      {
+        headers: {
+          "Accept-Language": "id",
+          "User-Agent": "Ambilidis-App",
+        },
+      }
+    );
+    const data = await response.json();
+    return data.display_name || null;
+  } catch (error) {
+    console.error("Error reverse geocoding:", error);
+    return null;
+  }
+}
+
+/**
  * LocationBanner — Ditampilkan saat lokasi buyer belum diset.
  * Mendukung GPS (navigator.geolocation) dan input koordinat manual sebagai fallback.
  */
@@ -75,8 +95,6 @@ export function LocationBanner({ onLocationSet }: LocationBannerProps) {
   const [isGettingGPS, setIsGettingGPS] = useState(false);
   const [gpsError, setGpsError] = useState(false);
   const [showManual, setShowManual] = useState(false);
-  const [manualLat, setManualLat] = useState("");
-  const [manualLng, setManualLng] = useState("");
 
   const handleRequestGPS = () => {
     setIsGettingGPS(true);
@@ -89,10 +107,16 @@ export function LocationBanner({ onLocationSet }: LocationBannerProps) {
     }
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+
+        // Ambil alamat asli dari Nominatim
+        const address = await getAddressFromCoords(lat, lng);
+
         const loc: UserLocation = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          label: "GPS",
+          lat,
+          lng,
+          label: address || "Lokasi GPS",
         };
         saveLocation(loc);
         onLocationSet(loc);
@@ -109,28 +133,16 @@ export function LocationBanner({ onLocationSet }: LocationBannerProps) {
     );
   };
 
-  const handleManualSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const lat = parseFloat(manualLat);
-    const lng = parseFloat(manualLng);
-    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-      alert("Koordinat tidak valid. Lat: -90 s/d 90, Lng: -180 s/d 180.");
-      return;
-    }
-    const loc: UserLocation = { lat, lng, label: "Manual" };
-    saveLocation(loc);
-    onLocationSet(loc);
-    // Save to profile database
-    await saveLocationToProfile(loc);
-  };
-
   return (
-    <div className="relative rounded-2xl overflow-hidden">
-      {/* Background blur */}
-      <div
-        className="absolute inset-0 bg-cover bg-center scale-105"
-        style={{ backgroundImage: `url(${BG_IMAGE})`, filter: "blur(8px) brightness(0.4)" }}
-      />
+    <div className="relative rounded-2xl overflow-hidden shadow-xl">
+      {/* Gradient Background */}
+      <div className="absolute inset-0 bg-linear-to-br from-primary to-primary/90" />
+
+      {/* Decorative patterns (optional but premium) */}
+      <div className="absolute inset-0 opacity-10 pointer-events-none">
+        <div className="absolute top-[-20%] right-[-10%] w-[60%] h-[60%] rounded-full bg-white blur-3xl" />
+        <div className="absolute bottom-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-black blur-3xl" />
+      </div>
       {/* Content */}
       <div className="relative z-10 p-8 text-center space-y-5">
         <div className="mx-auto bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-full w-fit shadow-lg">
@@ -160,13 +172,13 @@ export function LocationBanner({ onLocationSet }: LocationBannerProps) {
               onClick={() => setShowManual(true)}
               className="text-white/70 text-sm hover:text-white underline underline-offset-2 transition-colors"
             >
-              Input koordinat manual
+              Cari alamat manual
             </button>
             {/* shadcn Alert untuk error GPS */}
             {gpsError && (
               <Alert variant="destructive" className="bg-red-500/20 border-red-400/30 text-white">
                 <AlertDescription className="text-red-200 text-xs">
-                  GPS ditolak browser. Gunakan input manual di bawah.
+                  GPS ditolak browser. Gunakan pencarian manual di bawah.
                 </AlertDescription>
               </Alert>
             )}
@@ -174,7 +186,7 @@ export function LocationBanner({ onLocationSet }: LocationBannerProps) {
         ) : (
           /* Location search input */
           <div className="max-w-xs mx-auto space-y-3">
-            <p className="text-white/80 text-xs">
+            <p className="text-white/80 text-xs text-center">
               Cari alamat atau lokasi yang kamu inginkan.
             </p>
             <LocationSearch
@@ -191,6 +203,7 @@ export function LocationBanner({ onLocationSet }: LocationBannerProps) {
               }}
               placeholder="Cari alamat atau lokasi..."
               className="w-full"
+              variant="dark"
             />
             <button
               type="button"
@@ -208,7 +221,6 @@ export function LocationBanner({ onLocationSet }: LocationBannerProps) {
 
 /**
  * LocationBar — Compact bar yang ditampilkan ketika lokasi sudah diset.
- * Menampilkan koordinat dan tombol untuk menghapus/mengubah lokasi.
  */
 export function LocationBar({
   location,
@@ -218,18 +230,19 @@ export function LocationBar({
   onClear: () => void;
 }) {
   return (
-    <div className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl border shadow-sm">
-      <MapPin className="h-4 w-4 text-green-500 shrink-0" />
+    <div className="flex items-center gap-3 bg-card px-4 py-3 rounded-xl border border-border shadow-sm">
+      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+        <MapPin className="h-4 w-4 text-primary" />
+      </div>
       <div className="flex-1 min-w-0">
-        <span className="font-semibold text-sm text-gray-900 block">Lokasi Anda</span>
-        <span className="text-xs text-gray-500 truncate block">
-          {location.label === "Manual" ? "Input Manual — " : "GPS — "}
-          {location.lat.toFixed(5)}, {location.lng.toFixed(5)}
+        <span className="font-semibold text-sm text-foreground block">Lokasi Anda</span>
+        <span className="text-xs text-muted-foreground truncate block italic">
+          {location.label || `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`}
         </span>
       </div>
       <button
         onClick={onClear}
-        className="shrink-0 text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-lg hover:bg-gray-100"
+        className="shrink-0 text-muted-foreground hover:text-foreground transition-colors p-2 rounded-lg hover:bg-muted"
         title="Ubah lokasi"
       >
         <X className="h-4 w-4" />

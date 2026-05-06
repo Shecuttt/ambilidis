@@ -26,11 +26,13 @@ export const AuthProvider = ({ children, initialUser }: AuthProviderProps) => {
   const [isLoading, setIsLoading] = useState(!initialUser);
   const router = useRouter();
 
-  useEffect(() => {
-    // Sinkronisasi state saat data dari server berubah
+  const [prevInitialUser, setPrevInitialUser] = useState(initialUser);
+
+  if (initialUser !== prevInitialUser) {
     setUser(initialUser);
+    setPrevInitialUser(initialUser);
     setIsLoading(false);
-  }, [initialUser]);
+  }
 
   useEffect(() => {
     // Listener untuk perubahan status auth (login, logout, token refresh)
@@ -39,7 +41,17 @@ export const AuthProvider = ({ children, initialUser }: AuthProviderProps) => {
       // Kita abaikan INITIAL_SESSION dengan user undefined karena itu normal pada arsitektur httpOnly cookies
       
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        setUser(session?.user || null);
+        if (session?.user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+          
+          setUser({ ...session.user, ...profile });
+        } else {
+          setUser(null);
+        }
         router.refresh();
       }
 

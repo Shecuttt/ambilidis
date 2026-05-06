@@ -62,6 +62,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to create store' }, { status: 500 });
     }
 
+    // Update user role to include 'seller' and 'buyer'
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    const currentRoles = Array.isArray(profile?.role) ? profile.role : [];
+    const rolesToAdd = ['seller', 'buyer'];
+    const missingRoles = rolesToAdd.filter(r => !currentRoles.includes(r));
+
+    if (missingRoles.length > 0) {
+      const newRoles = [...currentRoles, ...missingRoles];
+      await supabaseAdmin
+        .from('profiles')
+        .update({ 
+          role: newRoles,
+          agreed_at: null // Force re-agreement when becoming a seller
+        })
+        .eq('id', user.id);
+    }
+
     return NextResponse.json({ success: true, store });
   } catch (err: any) {
     console.error("POST Stores Error:", err.message);

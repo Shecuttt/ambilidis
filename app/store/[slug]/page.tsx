@@ -78,11 +78,6 @@ export default function StoreDetail({ params }: { params: Promise<{ slug: string
     setConflictProduct(null);
   };
 
-  useEffect(() => {
-    fetchStoreAndProducts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug]);
-
   const fetchStoreAndProducts = async () => {
     setIsLoading(true);
 
@@ -108,15 +103,20 @@ export default function StoreDetail({ params }: { params: Promise<{ slug: string
     setIsLoading(false);
   };
 
+  useEffect(() => {
+    setTimeout(() => fetchStoreAndProducts(), 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug]);
+
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50/50">
+      <div className="min-h-screen bg-background">
         <Skeleton className="w-full h-64 rounded-none" />
         <div className="max-w-4xl mx-auto p-4 space-y-4 mt-4">
           <Skeleton className="h-24 w-3/4 rounded-xl" />
           <Skeleton className="h-16 w-full rounded-xl" />
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="flex gap-4 p-3 bg-white rounded-xl border">
+            <div key={i} className="flex gap-4 p-3 bg-card rounded-xl border">
               <Skeleton className="h-20 w-20 shrink-0 rounded-lg" />
               <div className="flex-1 space-y-2 py-2">
                 <Skeleton className="h-4 w-1/2" />
@@ -133,7 +133,7 @@ export default function StoreDetail({ params }: { params: Promise<{ slug: string
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-3">
-          <p className="text-gray-500">Toko tidak ditemukan.</p>
+          <p className="text-muted-foreground">Toko tidak ditemukan.</p>
           <Button onClick={() => router.back()} variant="outline">Kembali</Button>
         </div>
       </div>
@@ -144,7 +144,7 @@ export default function StoreDetail({ params }: { params: Promise<{ slug: string
   const unavailableProducts = products.filter(p => !p.is_available);
 
   return (
-    <div className="min-h-screen bg-gray-50/50 pb-28">
+    <div className="min-h-screen bg-background pb-28">
 
       {/* ── Wide Store Header ── */}
       <div className="relative w-full h-64 bg-gray-300 overflow-hidden">
@@ -165,7 +165,7 @@ export default function StoreDetail({ params }: { params: Promise<{ slug: string
 
         {/* Store Logo floating over banner */}
         {store.logo_url && (
-          <div className="absolute bottom-6 left-5 h-20 w-20 rounded-2xl border-4 border-white shadow-xl overflow-hidden bg-white z-10 translate-y-3">
+          <div className="absolute bottom-6 left-5 h-20 w-20 rounded-2xl border-4 border-background shadow-xl overflow-hidden bg-background z-10 translate-y-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={store.logo_url} alt="Logo" className="w-full h-full object-cover" />
           </div>
@@ -183,7 +183,7 @@ export default function StoreDetail({ params }: { params: Promise<{ slug: string
         <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
           {store.is_open ? (
             <Badge className="bg-green-500 text-white border-transparent gap-1.5 shadow-lg">
-              <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+              <span className="h-1.5 w-1.5 rounded-full bg-background animate-pulse" />
               Buka
             </Badge>
           ) : (
@@ -224,7 +224,7 @@ export default function StoreDetail({ params }: { params: Promise<{ slug: string
             <MessageSquareQuote className="h-5 w-5 text-primary shrink-0 mt-0.5" />
             <div>
               <p className="text-xs text-primary/70 font-medium uppercase tracking-wider mb-0.5">Sapaan Hari Ini</p>
-              <p className="text-sm text-gray-800 font-medium italic">"{store.tagline_today}"</p>
+              <p className="text-sm text-foreground font-medium italic">&quot;{store.tagline_today}&quot;</p>
             </div>
           </div>
         </div>
@@ -233,18 +233,18 @@ export default function StoreDetail({ params }: { params: Promise<{ slug: string
       {/* ── Deskripsi toko ── */}
       {store.description && (
         <div className="max-w-4xl mx-auto px-4 pt-3">
-          <p className="text-sm text-gray-500">{store.description}</p>
+          <p className="text-sm text-muted-foreground">{store.description}</p>
         </div>
       )}
 
       {/* ── Product List ── */}
       <div className="max-w-4xl mx-auto px-4 pt-5 space-y-5">
-        <h2 className="font-bold text-lg text-gray-900">
+        <h2 className="font-bold text-lg text-foreground">
           Produk ({availableProducts.length} tersedia)
         </h2>
 
         {products.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground bg-white rounded-xl border border-dashed">
+          <div className="text-center py-12 text-muted-foreground bg-card rounded-xl border border-dashed">
             Belum ada produk yang ditampilkan.
           </div>
         ) : (
@@ -273,7 +273,7 @@ export default function StoreDetail({ params }: { params: Promise<{ slug: string
             {/* Unavailable products — non-interactive */}
             {unavailableProducts.length > 0 && (
               <div className="space-y-3">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-1">Stok Habis</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1">Stok Habis</p>
                 {unavailableProducts.map(product => (
                   <UnavailableProductRow key={product.id} product={product} />
                 ))}
@@ -286,7 +286,7 @@ export default function StoreDetail({ params }: { params: Promise<{ slug: string
 
       {/* ── Floating Cart Button ── */}
       {cartTotalItems > 0 && cartStoreId === store?.id && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-linear-to-t from-white via-white to-transparent pb-6 z-30">
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-linear-to-t from-background via-background to-transparent pb-6 z-30">
           <div className="max-w-4xl mx-auto">
             <Link href="/checkout">
               <Button className="w-full h-14 rounded-2xl shadow-lg flex items-center justify-between px-6 text-lg">
@@ -336,7 +336,7 @@ function AvailableProductRow({
   onDec: () => void;
 }) {
   return (
-    <div className="bg-white rounded-2xl border shadow-sm overflow-hidden flex items-center gap-3 pr-4 hover:shadow-md transition-shadow">
+    <div className="bg-card rounded-2xl border shadow-sm overflow-hidden flex items-center gap-3 pr-4 hover:shadow-md transition-shadow">
       {/* Thumbnail */}
       <div className="h-20 w-20 shrink-0 overflow-hidden bg-gray-100">
         {product.photo_url ? (
@@ -351,13 +351,13 @@ function AvailableProductRow({
 
       {/* Info */}
       <div className="flex-1 min-w-0 py-3 space-y-0.5">
-        <p className="font-semibold text-gray-900 text-sm leading-tight line-clamp-1">{product.name}</p>
+        <p className="font-semibold text-foreground text-sm leading-tight line-clamp-1">{product.name}</p>
         {product.description && (
-          <p className="text-xs text-gray-400 line-clamp-1">{product.description}</p>
+          <p className="text-xs text-muted-foreground line-clamp-1">{product.description}</p>
         )}
-        <div className="text-sm font-bold text-primary">
+        <div className="text-sm font-bold text-accent">
           {formatRp(product.price)}
-          <span className="text-xs text-gray-400 font-normal ml-1">/ {product.unit}</span>
+          <span className="text-xs text-muted-foreground font-normal ml-1">/ {product.unit}</span>
         </div>
       </div>
 
@@ -375,11 +375,11 @@ function AvailableProductRow({
             <div className="flex items-center gap-2 bg-gray-50 rounded-full border px-1.5 py-1">
               <button
                 onClick={onDec}
-                className="h-7 w-7 flex items-center justify-center rounded-full bg-white shadow-sm border text-gray-600 hover:bg-gray-50 active:scale-95 transition-all"
+                className="h-7 w-7 flex items-center justify-center rounded-full bg-card shadow-sm border text-foreground hover:bg-muted active:scale-95 transition-all"
               >
                 <Minus className="h-3 w-3" />
               </button>
-              <span className="text-sm font-bold w-4 text-center text-gray-900">{qty}</span>
+              <span className="text-sm font-bold w-4 text-center text-foreground">{qty}</span>
               <button
                 onClick={onInc}
                 className="h-7 w-7 flex items-center justify-center rounded-full bg-primary text-white shadow-sm hover:bg-primary/90 active:scale-95 transition-all"
@@ -390,7 +390,7 @@ function AvailableProductRow({
           )}
         </div>
       ) : (
-        <Badge variant="outline" className="shrink-0 text-gray-400 border-gray-200">
+        <Badge variant="outline" className="text-accent border-accent/20 bg-accent/10 text-xs gap-1.5">
           Tutup
         </Badge>
       )}
@@ -401,7 +401,7 @@ function AvailableProductRow({
 // ── Unavailable Product Row ───────────────────────────────────
 function UnavailableProductRow({ product }: { product: ProductData }) {
   return (
-    <div className="bg-white rounded-2xl border overflow-hidden flex items-center gap-3 pr-4 opacity-50 cursor-not-allowed select-none">
+    <div className="bg-card rounded-2xl border overflow-hidden flex items-center gap-3 pr-4 opacity-50 cursor-not-allowed select-none">
       {/* Thumbnail — greyscale */}
       <div className="h-20 w-20 shrink-0 overflow-hidden bg-gray-100 grayscale">
         {product.photo_url ? (
@@ -416,11 +416,11 @@ function UnavailableProductRow({ product }: { product: ProductData }) {
 
       {/* Info */}
       <div className="flex-1 min-w-0 py-3 space-y-0.5">
-        <p className="font-semibold text-gray-700 text-sm leading-tight line-clamp-1">{product.name}</p>
+        <p className="font-semibold text-foreground text-sm leading-tight line-clamp-1">{product.name}</p>
         {product.description && (
-          <p className="text-xs text-gray-400 line-clamp-1">{product.description}</p>
+          <p className="text-xs text-muted-foreground line-clamp-1">{product.description}</p>
         )}
-        <div className="text-sm font-medium text-gray-400">
+        <div className="text-sm font-medium text-muted-foreground">
           {formatRp(product.price)}
           <span className="text-xs font-normal ml-1">/ {product.unit}</span>
         </div>

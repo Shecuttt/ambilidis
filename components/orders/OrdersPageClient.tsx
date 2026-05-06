@@ -33,7 +33,7 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
         <button
           key={star}
           type="button"
-          className={`text-2xl transition-colors ${star <= (hovered || value) ? "text-yellow-400" : "text-gray-300"
+          className={`text-2xl transition-colors ${star <= (hovered || value) ? "text-yellow-400" : "text-muted"
             }`}
           onClick={() => onChange(star)}
           onMouseEnter={() => setHovered(star)}
@@ -261,7 +261,7 @@ export function OrdersPageClient({ initialUser, initialOrders }: OrdersPageClien
                     {getStatusBadge(order.status)}
 
                     {/* Jenis Pembayaran */}
-                    <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-100 hover:bg-blue-100 font-medium">
+                    <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 font-medium">
                       {order.payment_method === 'cod' ? 'COD' : 'Transfer'}
                     </Badge>
 
@@ -271,7 +271,7 @@ export function OrdersPageClient({ initialUser, initialOrders }: OrdersPageClien
                         Lunas
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                      <Badge variant="outline" className="bg-muted text-muted-foreground border-border">
                         Belum Bayar
                       </Badge>
                     )}
@@ -344,10 +344,10 @@ export function OrdersPageClient({ initialUser, initialOrders }: OrdersPageClien
                 )}
 
                 {order.ratings?.rating && (
-                  <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
+                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-border">
                     <div className="flex items-center gap-2">
                       <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                      <span className="font-semibold">Rating Anda: {order.ratings.rating}/5</span>
+                      <span className="font-semibold text-foreground">Rating Anda: {order.ratings.rating}/5</span>
                     </div>
                     <Button
                       variant="ghost"
@@ -360,7 +360,7 @@ export function OrdersPageClient({ initialUser, initialOrders }: OrdersPageClien
                 )}
 
                 {order.ratings?.complaints && order.ratings.complaints.length > 0 && (
-                  <div className="mt-2 p-2 bg-orange-50 rounded text-sm text-orange-800">
+                  <div className="mt-2 p-2 bg-muted/30 rounded text-sm text-muted-foreground italic">
                     <strong>Keluhan:</strong> {order.ratings.complaints.join(', ')}
                   </div>
                 )}

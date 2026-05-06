@@ -88,15 +88,15 @@ export function StoreCard({
           </div>
 
           {/* ── Info Toko ── */}
-          <CardContent className="p-4 flex flex-col justify-between flex-1 bg-white">
+          <CardContent className="p-4 flex flex-col justify-between flex-1 bg-card">
             <div className="space-y-1.5">
-              <h3 className="font-bold text-gray-900 leading-tight line-clamp-1">{name}</h3>
+              <h3 className="font-bold text-foreground leading-tight line-clamp-1">{name}</h3>
               {tagline_today ? (
                 <p className="text-xs text-primary/80 italic line-clamp-1">
                   💬 {tagline_today}
                 </p>
               ) : (
-                <p className="text-xs text-gray-400 line-clamp-1">
+                <p className="text-xs text-muted-foreground line-clamp-1">
                   {description || "Toko Sembako"}
                 </p>
               )}
@@ -109,7 +109,7 @@ export function StoreCard({
               </span>
               {/* Status buka/tutup — pakai Badge shadcn */}
               {is_open ? (
-                <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50 text-xs gap-1.5">
+                <Badge variant="outline" className="text-primary border-primary/20 bg-primary/10 text-xs gap-1.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse inline-block" />
                   Buka
                 </Badge>

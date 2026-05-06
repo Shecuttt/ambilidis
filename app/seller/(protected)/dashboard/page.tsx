@@ -14,6 +14,18 @@ async function getSellerDashboardData() {
     redirect("/login");
   }
 
+  // Fetch profile for role check
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (!profile || !Array.isArray(profile.role) || !profile.role.includes('seller')) {
+    // If authenticated but not a seller, redirect to setup or home
+    redirect("/seller/setup");
+  }
+
   // Fetch store
   const { data: stores, error: storeError } = await supabase
     .from('stores')
@@ -51,7 +63,7 @@ async function getSellerDashboardData() {
   // Fetch stats
   const [
     { count: activeCount },
-    { count: pendingCount },
+    ,
     { data: revenueData },
     { count: productsCount }
   ] = await Promise.all([

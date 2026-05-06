@@ -69,3 +69,21 @@
 
 *Constraint:*
 *Toko dengan `is_open = false` tidak muncul di discovery buyer*
+
+## 9. Role sebagai array
+
+*Context:*
+*Role saat ini disimpan sebagai single value TEXT. Perlu diubah ke array agar satu user bisa punya kapabilitas buyer dan seller sekaligus.*
+
+*Yang perlu diimplementasi:*
+1. *Ubah kolom `role` di tabel `profiles` dari `TEXT` ke `TEXT[]`*
+2. *Update default value saat signup:*
+   - *Via `/seller/login` → `['seller', 'buyer']`*
+   - *Via `/login` → `['buyer']`*
+3. *Update semua RLS policy yang cek role — dari `role = 'seller'` ke `'seller' = ANY(role)`*
+4. *Update routing guard — cek `role` array mengandung `'seller'` untuk akses dashboard seller*
+5. *Jika buyer membuka toko → append `'seller'` ke array tanpa menghapus `'buyer'`*
+6. *Ganti tombol "Dashboard seller" menjadi "Buka Toko" di `Navbar.tsx` buyer. Saat tombol "Buka Toko" diklik, append `'seller'` ke role array user tersebut, lalu redirect ke halaman setup toko*
+
+*Constraint:*
+*`'buyer'` tidak pernah dihapus dari array — sekali terdaftar, user selalu bisa belanja*

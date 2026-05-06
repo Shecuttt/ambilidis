@@ -100,7 +100,7 @@ export function CheckoutPageClient({ initialUser }: CheckoutPageClientProps) {
     };
 
     loadStoreInfo();
-    
+
     const calcDistance = async () => {
       setIsCalcingDist(true);
       try {
@@ -153,11 +153,11 @@ export function CheckoutPageClient({ initialUser }: CheckoutPageClientProps) {
   // Success state check (MUST be before items.length check)
   if (isSuccess) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="max-w-md w-full">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-md w-full bg-card border-border">
           <CardContent className="pt-6 text-center space-y-4">
-            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-              <CheckCircle2 className="h-8 w-8 text-green-600" />
+            <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+              <CheckCircle2 className="h-8 w-8 text-primary" />
             </div>
             <div>
               <h2 className="text-2xl font-bold">Pesanan Berhasil!</h2>
@@ -184,11 +184,11 @@ export function CheckoutPageClient({ initialUser }: CheckoutPageClientProps) {
   // Empty state check
   if (items.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="max-w-md w-full">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-md w-full bg-card border-border">
           <CardContent className="pt-6 text-center space-y-4">
-            <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
-              <ShoppingBag className="h-8 w-8 text-gray-400" />
+            <div className="mx-auto w-16 h-16 bg-muted rounded-full flex items-center justify-center">
+              <ShoppingBag className="h-8 w-8 text-muted-foreground" />
             </div>
             <div>
               <h2 className="text-2xl font-bold">Keranjang Kosong</h2>
@@ -196,11 +196,11 @@ export function CheckoutPageClient({ initialUser }: CheckoutPageClientProps) {
                 Keranjang belanja Anda masih kosong. Mulai belanja untuk mengisi keranjang.
               </p>
             </div>
-            <div className="space-y-2">
-              <Link href="/discovery">
+            <div className="flex flex-col gap-2">
+              <Link href="/discovery" className="w-full">
                 <Button className="w-full">Cari Toko</Button>
               </Link>
-              <Link href="/">
+              <Link href="/" className="w-full">
                 <Button variant="outline" className="w-full">
                   Kembali ke Beranda
                 </Button>
@@ -297,18 +297,18 @@ export function CheckoutPageClient({ initialUser }: CheckoutPageClientProps) {
 
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <Script
         src="https://app.sandbox.midtrans.com/snap/snap.js"
         data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
       />
 
       {/* Header */}
-      <div className="bg-white border-b">
+      <div className="bg-card border-b border-border">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="icon"
               onClick={() => router.back()}
             >
@@ -330,7 +330,7 @@ export function CheckoutPageClient({ initialUser }: CheckoutPageClientProps) {
                   <MapPin className="h-5 w-5 text-primary" />
                   <h3 className="font-semibold">Alamat Pengiriman</h3>
                 </div>
-                
+
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="address">Alamat Lengkap</Label>
@@ -342,14 +342,14 @@ export function CheckoutPageClient({ initialUser }: CheckoutPageClientProps) {
                       rows={3}
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Cari Lokasi Pengiriman</Label>
                     <LocationSearch
                       onLocationSelect={async (location) => {
                         // Update address dengan lokasi yang dipilih
                         setAddress(location.label);
-                        
+
                         // Save to profile database
                         try {
                           const { error } = await supabase
@@ -370,7 +370,7 @@ export function CheckoutPageClient({ initialUser }: CheckoutPageClientProps) {
                         // Update sessionStorage untuk distance calculation
                         const buyerLoc = { lat: location.lat, lng: location.lng };
                         sessionStorage.setItem("ambilidis_buyer_location", JSON.stringify(buyerLoc));
-                        
+
                         // Recalculate distance
                         if (storeId) {
                           const { data } = await supabase
@@ -410,8 +410,8 @@ export function CheckoutPageClient({ initialUser }: CheckoutPageClientProps) {
             <Card>
               <CardContent className="pt-6">
                 <h3 className="font-semibold mb-4">Detail Pesanan</h3>
-                <CheckoutSummary 
-                  items={items} 
+                <CheckoutSummary
+                  items={items}
                   total={total}
                   deliveryFee={deliveryFee}
                   distanceKm={distanceKm}
@@ -446,7 +446,7 @@ export function CheckoutPageClient({ initialUser }: CheckoutPageClientProps) {
                   <Alert className="mt-4">
                     <AlertTriangle className="h-4 w-4" />
                     <AlertDescription>
-                      Anda akan diarahkan ke halaman pembayaran setelah menekan tombol "Buat Pesanan".
+                      Anda akan diarahkan ke halaman pembayaran setelah menekan tombol &quot;Buat Pesanan&quot;.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -477,7 +477,7 @@ export function CheckoutPageClient({ initialUser }: CheckoutPageClientProps) {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold">Ringkasan Pembayaran</h3>
                   {storeInfo && (
-                    <Link 
+                    <Link
                       href={`/store/${storeInfo.slug || storeInfo.id}`}
                       className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
                     >
@@ -486,13 +486,13 @@ export function CheckoutPageClient({ initialUser }: CheckoutPageClientProps) {
                     </Link>
                   )}
                 </div>
-                
+
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm">
                     <span>Subtotal ({items.length} item)</span>
                     <span>{formatRp(total)}</span>
                   </div>
-                  
+
                   <div className="flex justify-between text-sm">
                     <span>Biaya pengiriman</span>
                     {isCalcingDist ? (
@@ -501,7 +501,7 @@ export function CheckoutPageClient({ initialUser }: CheckoutPageClientProps) {
                       <span>{formatRp(deliveryFee)}</span>
                     )}
                   </div>
-                  
+
                   <div className="border-t pt-3">
                     <div className="flex justify-between font-semibold">
                       <span>Total</span>

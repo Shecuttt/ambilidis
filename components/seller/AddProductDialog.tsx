@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -77,7 +77,7 @@ export function AddProductDialog({ storeId, onProductAdded }: AddProductDialogPr
     if (photoInputRef.current) photoInputRef.current.value = "";
   };
 
-  const onSubmit = async (values: ProductFormValues) => {
+  const onSubmit = useCallback(async (values: ProductFormValues) => {
     if (!storeId) return;
 
     setIsSubmitting(true);
@@ -137,7 +137,7 @@ export function AddProductDialog({ storeId, onProductAdded }: AddProductDialogPr
       setIsSubmitting(false);
       setIsUploadingPhoto(false);
     }
-  };
+  }, [storeId, productPhoto, onProductAdded, reset]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
@@ -158,7 +158,7 @@ export function AddProductDialog({ storeId, onProductAdded }: AddProductDialogPr
           <DialogTitle>Tambah Produk Baru</DialogTitle>
           <DialogDescription>Masukkan detail produk yang ingin Anda jual.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
+        <form onSubmit={(e) => handleSubmit(onSubmit)(e)} className="space-y-4 py-2">
           {/* Foto Produk */}
           <div className="space-y-2">
             <Label>Foto Produk <span className="text-xs text-muted-foreground">(maks. 1 MB)</span></Label>

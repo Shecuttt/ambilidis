@@ -8,6 +8,7 @@ import { Analytics } from '@vercel/analytics/next';
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { AuthProvider } from "@/components/providers/AuthProvider";
+import { LegalReagreementOverlay } from "@/components/LegalReagreementOverlay";
 
 const jakartaSans = Plus_Jakarta_Sans({
   variable: "--font-jakarta-sans",
@@ -30,17 +31,32 @@ export default async function RootLayout({
   // Fetch user data server-side
   const { data: { user } } = await supabase.auth.getUser();
 
+  // If user is authenticated, fetch their profile for role information
+  let userWithProfile = user;
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+    
+    if (profile) {
+      userWithProfile = { ...user, ...profile };
+    }
+  }
+
   return (
     <html
       lang="id"
       className={`${jakartaSans.className} h-full antialiased`}
     >
       <body className="min-h-screen flex flex-col">
-        <AuthProvider initialUser={user}>
+        <AuthProvider initialUser={userWithProfile}>
           <TooltipProvider>
             <main className="flex-1">
               {children}
             </main>
+            <LegalReagreementOverlay />
           </TooltipProvider>
         </AuthProvider>
         {/* Sonner toast notifications — dipakai di seluruh app */}

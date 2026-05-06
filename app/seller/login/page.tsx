@@ -10,10 +10,12 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Store, Loader2 } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 
 const authSchema = z.object({
@@ -29,6 +31,7 @@ export default function SellerLoginPage() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [agreeTerms, setAgreeTerms] = useState(false);
 
   const {
     register,
@@ -56,7 +59,13 @@ export default function SellerLoginPage() {
           return;
         }
 
-        const { error: signUpError } = await supabase.auth.signUp({
+        if (!agreeTerms) {
+          setErrorMsg("Anda wajib menyetujui Syarat & Ketentuan dan Kebijakan Privasi.");
+          setIsLoading(false);
+          return;
+        }
+
+        const { data: authData, error: signUpError } = await supabase.auth.signUp({
           email: data.email,
           password: data.password,
           options: {
@@ -68,6 +77,14 @@ export default function SellerLoginPage() {
         });
 
         if (signUpError) throw signUpError;
+
+        if (authData.user) {
+          // Attempt to update agreed_at in profiles directly
+          await supabase
+            .from('profiles')
+            .update({ agreed_at: new Date().toISOString() })
+            .eq('id', authData.user.id);
+        }
 
         toast.success("Pendaftaran berhasil! Silakan login.");
         setIsSignUp(false);
@@ -82,14 +99,29 @@ export default function SellerLoginPage() {
 
         // Update role in profiles table
         if (authData.user) {
-          const { error: profileError } = await supabase
+          // Fetch current profile to avoid overwriting roles array
+          const { data: profile } = await supabase
             .from('profiles')
-            .upsert({
-              id: authData.user.id,
-              role: 'seller',
-            });
+            .select('role')
+            .eq('id', authData.user.id)
+            .single();
 
-          if (profileError) throw profileError;
+          const currentRoles = Array.isArray(profile?.role) ? profile.role : [];
+          // Ensure both seller and buyer roles are present when logging in as seller
+          const rolesToAdd = ['seller', 'buyer'];
+          const missingRoles = rolesToAdd.filter(r => !currentRoles.includes(r));
+
+          if (missingRoles.length > 0) {
+            const newRoles = [...currentRoles, ...missingRoles];
+            const { error: profileError } = await supabase
+              .from('profiles')
+              .upsert({
+                id: authData.user.id,
+                role: newRoles,
+              });
+
+            if (profileError) throw profileError;
+          }
         }
 
         // Show welcome toast with user's full name
@@ -141,7 +173,8 @@ export default function SellerLoginPage() {
                 )}
               </div>
             )}
-            
+
+
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -175,6 +208,31 @@ export default function SellerLoginPage() {
               </Alert>
             )}
 
+            {isSignUp && (
+              <div className="flex items-center space-x-2 pb-2">
+                <Checkbox
+                  id="agreeTerms"
+                  checked={agreeTerms}
+                  onCheckedChange={(checked) => setAgreeTerms(checked as boolean)}
+                  className="border-muted-foreground/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                />
+                <label
+                  htmlFor="agreeTerms"
+                  className="text-[13px] text-muted-foreground leading-tight cursor-pointer select-none"
+                >
+                  Saya setuju dengan{" "}
+                  <Link href="/terms" className="text-primary font-medium hover:underline" target="_blank">
+                    Syarat & Ketentuan
+                  </Link>{" "}
+                  dan{" "}
+                  <Link href="/privacy" className="text-primary font-medium hover:underline" target="_blank">
+                    Kebijakan Privasi
+                  </Link>
+                  .
+                </label>
+              </div>
+            )}
+
             <Button className="w-full font-semibold" type="submit" disabled={isLoading}>
               {isLoading ? (
                 <>
@@ -203,6 +261,7 @@ export default function SellerLoginPage() {
             onClick={() => {
               setIsSignUp(!isSignUp);
               setErrorMsg("");
+              setAgreeTerms(false);
               reset();
             }}
           >
