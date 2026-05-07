@@ -121,11 +121,11 @@ export function OrdersPageClient({ initialUser, initialOrders }: OrdersPageClien
 
       setOrders(prev =>
         prev.map(o => o.id === orderId
-          ? { 
-              ...o, 
-              status: newStatus,
-              payment_status: newStatus === 'completed' ? 'paid' : o.payment_status 
-            }
+          ? {
+            ...o,
+            status: newStatus,
+            payment_status: newStatus === 'completed' ? 'paid' : o.payment_status
+          }
           : o
         )
       );
@@ -219,151 +219,139 @@ export function OrdersPageClient({ initialUser, initialOrders }: OrdersPageClien
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-5xl mx-auto space-y-12 px-4 sm:px-6 pt-4 sm:pt-8 pb-24">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 sm:gap-6">
         <Link href="/">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
+          <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 sm:h-12 sm:w-12 bg-muted/20 sm:bg-transparent">
+            <ArrowLeft className="h-5 w-5" />
           </Button>
         </Link>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Pesanan Saya</h1>
-          <p className="text-muted-foreground">Riwayat pesanan Anda.</p>
+        <div className="space-y-0.5">
+          <h1 className="text-xl sm:text-3xl font-black tracking-tight text-foreground/90">Pesanan Saya</h1>
+          <p className="text-muted-foreground text-[10px] sm:text-sm font-bold uppercase tracking-widest opacity-60">Riwayat transaksi belanja Anda</p>
         </div>
       </div>
 
       {/* Orders List */}
       {orders.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Package className="h-12 w-12 text-muted-foreground mb-4" />
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <div className="p-4 bg-muted rounded-full mb-4">
+              <Package className="h-12 w-12 text-muted-foreground" />
+            </div>
             <h3 className="text-lg font-semibold mb-2">Belum Ada Pesanan</h3>
-            <p className="text-muted-foreground text-center mb-4">
+            <p className="text-muted-foreground text-center max-w-xs mb-8">
               Anda belum memiliki pesanan. Mulai berbelanja untuk membuat pesanan pertama Anda.
             </p>
-            <Link href="/">
-              <Button>Mulai Berbelanja</Button>
+            <Link href="/discovery">
+              <Button className="rounded-xl px-8 h-12">Mulai Berbelanja</Button>
             </Link>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="grid gap-6">
           {orders.map((order) => (
-            <Card key={order.id} className="overflow-hidden">
-              <CardHeader className="pb-3">
+            <Card key={order.id} className="overflow-hidden hover:shadow-lg transition-all duration-300 border-muted-foreground/10">
+              <div className="bg-muted/30 px-4 py-3 flex items-center justify-between border-b">
+                <div className="flex items-center gap-2">
+                  <div className="bg-primary/10 p-1.5 rounded-lg">
+                    <Store className="h-4 w-4 text-primary" />
+                  </div>
+                  <span className="font-bold text-sm">{order.stores?.name}</span>
+                </div>
+                <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
+                  #{order.id.slice(-8)}
+                </div>
+              </div>
+
+              <CardHeader className="pb-3 pt-4">
                 <div className="flex items-center justify-between">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-mono bg-muted px-2 py-1 rounded text-muted-foreground">
-                      #{order.id.slice(-8).toUpperCase()}
-                    </span>
-                    
                     {getStatusBadge(order.status)}
-
-                    {/* Jenis Pembayaran */}
-                    <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 font-medium">
+                    <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-tight">
                       {order.payment_method === 'cod' ? 'COD' : 'Transfer'}
                     </Badge>
-
-                    {/* Status Pembayaran */}
-                    {order.payment_status === 'paid' ? (
-                      <Badge className="bg-green-500 text-white border-transparent hover:bg-green-600">
-                        Lunas
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="bg-muted text-muted-foreground border-border">
-                        Belum Bayar
-                      </Badge>
-                    )}
                   </div>
                   <div className="text-right">
-                    <div className="font-semibold">{formatRp(order.total_price)}</div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="font-black text-primary">{formatRp(order.total_price)}</div>
+                    <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-0.5">
                       {new Date(order.created_at).toLocaleDateString('id-ID', {
                         day: 'numeric',
                         month: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit'
+                        year: 'numeric'
                       })}
                     </div>
                   </div>
                 </div>
-
-                {/* Store Info */}
-                {order.stores && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Store className="h-4 w-4" />
-                    <span>{order.stores.name}</span>
-                  </div>
-                )}
               </CardHeader>
 
-              <CardContent className="pb-3">
-                <div className="space-y-2">
-                  {order.order_items?.map((item: any) => (
-                    <div key={item.id} className="flex justify-between text-sm">
-                      <span>{item.quantity}x {item.products?.name}</span>
-                      <span className="text-muted-foreground">
-                        {formatRp(item.price)}
-                      </span>
+              <CardContent className="pb-4">
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    {order.order_items?.slice(0, 2).map((item: any) => (
+                      <div key={item.id} className="flex justify-between text-sm items-center py-1 border-b border-muted last:border-0">
+                        <div className="flex items-center gap-2">
+                          <span className="bg-muted px-2 py-0.5 rounded-md text-[10px] font-bold">{item.quantity}x</span>
+                          <span className="font-medium text-foreground/80">{item.products?.name}</span>
+                        </div>
+                        <span className="text-muted-foreground text-xs tabular-nums">
+                          {formatRp(item.price)}
+                        </span>
+                      </div>
+                    ))}
+                    {order.order_items?.length > 2 && (
+                      <p className="text-[10px] text-muted-foreground italic mt-2">
+                        +{order.order_items.length - 2} produk lainnya...
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2">
+                    <Link href={`/orders/${order.id}`} className="flex-1">
+                      <Button variant="outline" size="sm" className="w-full rounded-xl h-10 border-primary/20 text-primary hover:bg-primary/5">
+                        Detail Pesanan
+                      </Button>
+                    </Link>
+
+                    {order.status === 'in_delivery' && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleUpdateStatus(order.id, 'completed')}
+                        className="flex-1 rounded-xl h-10 bg-green-600 hover:bg-green-700 shadow-md shadow-green-200"
+                      >
+                        Selesaikan
+                      </Button>
+                    )}
+
+                    {order.status === 'completed' && !order.ratings?.rating && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => openRatingDialog(order.id)}
+                        className="flex-1 rounded-xl h-10"
+                      >
+                        <Star className="h-4 w-4 mr-2 text-yellow-500 fill-yellow-500" />
+                        Beri Rating
+                      </Button>
+                    )}
+                  </div>
+
+                  {order.ratings?.rating && (
+                    <div className="flex items-center justify-between p-2.5 bg-yellow-50/50 rounded-xl border border-yellow-100">
+                      <div className="flex items-center gap-2">
+                        <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
+                        <span className="font-bold text-[11px] text-yellow-900">Rating: {order.ratings.rating}/5</span>
+                      </div>
+                      <button
+                        onClick={() => openRatingDialog(order.id)}
+                        className="text-[10px] font-bold text-yellow-700 hover:underline"
+                      >
+                        Ubah
+                      </button>
                     </div>
-                  ))}
+                  )}
                 </div>
-
-                {order.buyer_note && (
-                  <div className="mt-3 p-2 bg-muted rounded text-sm">
-                    <strong>Catatan:</strong> {order.buyer_note}
-                  </div>
-                )}
-              </CardContent>
-
-              <CardContent className="pt-0">
-                {order.status === 'in_delivery' && (
-                  <div className="flex justify-center pb-4">
-                    <Button
-                      size="sm"
-                      onClick={() => handleUpdateStatus(order.id, 'completed')}
-                      className="w-full bg-green-600 hover:bg-green-700"
-                    >
-                      Pesanan Diterima & Selesai
-                    </Button>
-                  </div>
-                )}
-
-                {order.status === 'completed' && !order.ratings?.rating && (
-                  <div className="flex justify-center">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openRatingDialog(order.id)}
-                    >
-                      <Star className="h-4 w-4 mr-2" />
-                      Beri Rating
-                    </Button>
-                  </div>
-                )}
-
-                {order.ratings?.rating && (
-                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-border">
-                    <div className="flex items-center gap-2">
-                      <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                      <span className="font-semibold text-foreground">Rating Anda: {order.ratings.rating}/5</span>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openRatingDialog(order.id)}
-                    >
-                      Ubah
-                    </Button>
-                  </div>
-                )}
-
-                {order.ratings?.complaints && order.ratings.complaints.length > 0 && (
-                  <div className="mt-2 p-2 bg-muted/30 rounded text-sm text-muted-foreground italic">
-                    <strong>Keluhan:</strong> {order.ratings.complaints.join(', ')}
-                  </div>
-                )}
               </CardContent>
             </Card>
           ))}

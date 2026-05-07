@@ -20,7 +20,7 @@ export async function GET(
       .from('stores')
       .select('*')
       .eq('slug', slug)
-      .single();
+      .maybeSingle();
 
     if (storeError || !store) {
       return NextResponse.json({ error: 'Store not found' }, { status: 404 });

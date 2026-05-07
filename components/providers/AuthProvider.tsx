@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import { useCartStore } from "@/lib/store";
 
 interface AuthContextType {
   user: any | null;
@@ -27,6 +28,13 @@ export const AuthProvider = ({ children, initialUser }: AuthProviderProps) => {
   const router = useRouter();
 
   const [prevInitialUser, setPrevInitialUser] = useState(initialUser);
+
+  // Clear cart if guest on first load to prevent stale state from previous guest sessions
+  useEffect(() => {
+    if (!initialUser) {
+      useCartStore.getState().clearCart();
+    }
+  }, [initialUser]); // Run on mount or if initialUser status changes
 
   if (initialUser !== prevInitialUser) {
     setUser(initialUser);
@@ -57,6 +65,7 @@ export const AuthProvider = ({ children, initialUser }: AuthProviderProps) => {
 
       if (event === 'SIGNED_OUT') {
         setUser(null);
+        useCartStore.getState().clearCart();
         router.push('/');
         router.refresh();
       }

@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Analytics } from '@vercel/analytics/next';
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
@@ -17,17 +18,47 @@ const jakartaSans = Plus_Jakarta_Sans({
 
 export const metadata: Metadata = {
   title: "Ambilidis",
-  description: "Hyperlocal marketplace",
+  description: "Your fresh products marketplace",
 };
 
-export default async function RootLayout({
+import { Suspense } from "react";
+
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  return (
+    <html
+      lang="id"
+      className={`${jakartaSans.className} h-full antialiased`}
+    >
+      <body className="min-h-screen flex flex-col">
+        <Suspense fallback={
+          <TooltipProvider>
+            <main className="flex-1 min-h-screen flex items-center justify-center">
+              <div className="animate-pulse flex flex-col items-center gap-4">
+                <div className="h-10 w-10 bg-primary/10 rounded-full" />
+                <div className="h-4 w-32 bg-muted rounded" />
+              </div>
+            </main>
+          </TooltipProvider>
+        }>
+          <AuthWrapper>{children}</AuthWrapper>
+        </Suspense>
+        {/* Sonner toast notifications — dipakai di seluruh app */}
+        <Toaster position="top-center" />
+        <Analytics />
+        <SpeedInsights />
+      </body>
+    </html>
+  );
+}
+
+async function AuthWrapper({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
-  
+
   // Fetch user data server-side
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -38,31 +69,21 @@ export default async function RootLayout({
       .from('profiles')
       .select('*')
       .eq('id', user.id)
-      .single();
-    
+      .maybeSingle();
+
     if (profile) {
       userWithProfile = { ...user, ...profile };
     }
   }
 
   return (
-    <html
-      lang="id"
-      className={`${jakartaSans.className} h-full antialiased`}
-    >
-      <body className="min-h-screen flex flex-col">
-        <AuthProvider initialUser={userWithProfile}>
-          <TooltipProvider>
-            <main className="flex-1">
-              {children}
-            </main>
-            <LegalReagreementOverlay />
-          </TooltipProvider>
-        </AuthProvider>
-        {/* Sonner toast notifications — dipakai di seluruh app */}
-        <Toaster position="top-center" />
-        <Analytics />
-      </body>
-    </html>
+    <AuthProvider initialUser={userWithProfile}>
+      <TooltipProvider>
+        <main className="flex-1">
+          {children}
+        </main>
+        <LegalReagreementOverlay />
+      </TooltipProvider>
+    </AuthProvider>
   );
 }

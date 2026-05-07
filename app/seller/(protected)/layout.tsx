@@ -3,12 +3,25 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { SellerSidebar } from "@/components/seller/SellerSidebar";
 import { Store } from "lucide-react";
+import { Suspense } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 
-export default async function SellerLayout({
+export default function SellerLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  return (
+    <SidebarProvider>
+      <Suspense fallback={<SellerLayoutSkeleton />}>
+        <SellerAuthWrapper>{children}</SellerAuthWrapper>
+      </Suspense>
+    </SidebarProvider>
+  );
+}
+
+async function SellerAuthWrapper({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
@@ -24,25 +37,10 @@ export default async function SellerLayout({
     .from('profiles')
     .select('role')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
 
   const roles = Array.isArray(profile?.role) ? profile.role : [];
   
-  // Strict guard for seller routes
-  // Note: Since /seller/login and /seller/setup are children of this layout,
-  // we should be careful. But our flow ensures users have 'seller' role 
-  // before being sent to /seller/setup via the "Buka Toko" button.
-  
-  // However, we can exclude /seller/setup and /seller/login if we want.
-  // Since we can't easily get the pathname in a Server Component layout without headers,
-  // we'll rely on the fact that if they reach this layout, they should be a seller 
-  // OR we'll let them through to /seller/setup if the page itself allows it.
-  
-  // Let's add a safe check: if they have NO 'seller' role, and we are not in setup/login, 
-  // but wait, layout is always rendered.
-  
-  // Recommendation: Put the specific role check in a middleware or in the pages.
-  // But since I'm here, I'll check if they have at least ONE role.
   if (roles.length === 0) {
     redirect("/login");
   }
@@ -57,25 +55,68 @@ export default async function SellerLayout({
   const store = stores?.[0] || null;
 
   return (
-    <div className="flex min-h-screen bg-gray-50/50">
+    <>
       <SellerSidebar store={store} />
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Mobile Header */}
-        <header className="lg:hidden flex items-center justify-between h-16 px-4 bg-white border-b sticky top-0 z-40">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-primary rounded-lg">
-              <Store className="h-4 w-4 text-white" />
+      <SidebarInset>
+        <div className="flex flex-col min-h-screen bg-gray-50/50">
+          {/* Dashboard Top Header */}
+          <header className="flex items-center h-16 px-4 bg-white border-b sticky top-0 z-40 gap-4">
+            <SidebarTrigger className="-ml-1" />
+            <div className="flex items-center gap-2 lg:hidden">
+              <div className="p-1.5 bg-primary rounded-lg">
+                <Store className="h-4 w-4 text-white" />
+              </div>
+              <span className="font-bold text-primary">ambilidis</span>
             </div>
-            <span className="font-bold text-primary">ambilidis</span>
-          </div>
-          {/* Sidebar trigger is handled inside SellerSidebar, but we can also put it here if we want more control. 
-              Currently SellerSidebar has a floating button. Let's move it into this header for a cleaner look. */}
-        </header>
+            {/* Context/Breadcrumbs could go here */}
+            <div className="ml-auto flex items-center gap-4">
+              {/* Optional: Notifications or other top actions */}
+            </div>
+          </header>
 
-        <main className="flex-1 lg:pl-64">
-          <div className="p-4 lg:p-8 max-w-5xl mx-auto">
-            {children}
+          <main className="flex-1">
+            <div className="p-4 lg:p-8 max-w-5xl mx-auto">
+              {children}
+            </div>
+          </main>
+        </div>
+      </SidebarInset>
+    </>
+  );
+}
+
+function SellerLayoutSkeleton() {
+  return (
+    <div className="flex w-full animate-pulse h-screen overflow-hidden">
+      {/* Sidebar Skeleton */}
+      <div className="hidden lg:flex flex-col w-64 border-r bg-white h-full p-6 space-y-8">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-10 w-10 rounded-xl" />
+          <Skeleton className="h-6 w-24" />
+        </div>
+        <div className="space-y-4 pt-4">
+          <Skeleton className="h-10 w-full rounded-lg" />
+          <Skeleton className="h-10 w-full rounded-lg" />
+          <Skeleton className="h-10 w-full rounded-lg" />
+          <Skeleton className="h-10 w-full rounded-lg" />
+        </div>
+      </div>
+      <div className="flex-1 flex flex-col">
+        <header className="flex items-center h-16 px-4 bg-white border-b gap-4">
+          <Skeleton className="h-8 w-8 rounded-md" />
+          <Skeleton className="h-6 w-32" />
+        </header>
+        <main className="p-4 lg:p-8 space-y-6 flex-1 bg-gray-50/50">
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-48" />
+            <Skeleton className="h-4 w-32" />
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Skeleton className="h-32 w-full rounded-3xl" />
+            <Skeleton className="h-32 w-full rounded-3xl" />
+            <Skeleton className="h-32 w-full rounded-3xl" />
+          </div>
+          <Skeleton className="h-96 w-full rounded-3xl" />
         </main>
       </div>
     </div>

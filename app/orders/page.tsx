@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { OrdersPageClient } from "@/components/orders/OrdersPageClient";
+import { Suspense } from "react";
 
 async function getOrdersPageData() {
   const cookieStore = await cookies();
@@ -56,7 +57,15 @@ async function getOrdersPageData() {
   };
 }
 
-export default async function OrdersPage() {
+export default function OrdersPage() {
+  return (
+    <Suspense fallback={<OrdersSkeleton />}>
+      <OrdersContent />
+    </Suspense>
+  );
+}
+
+async function OrdersContent() {
   const { user, orders } = await getOrdersPageData();
 
   return (
@@ -64,5 +73,18 @@ export default async function OrdersPage() {
       initialUser={user}
       initialOrders={orders}
     />
+  );
+}
+
+function OrdersSkeleton() {
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8 sm:py-12 space-y-8 animate-pulse">
+      <div className="h-10 w-48 bg-muted rounded-xl" />
+      <div className="space-y-4">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-32 w-full bg-muted rounded-3xl" />
+        ))}
+      </div>
+    </div>
   );
 }

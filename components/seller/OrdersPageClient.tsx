@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
-import { ArrowLeft, Clock, CheckCircle2, XCircle, Package, AlertTriangle, CheckSquare } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle2, XCircle, Package, AlertTriangle, CheckSquare, MapPin, User, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -112,6 +112,11 @@ export function OrdersPageClient({
                 order_items (
                   id, quantity, price,
                   products (name, unit)
+                ),
+                profiles!orders_buyer_id_fkey (
+                  address,
+                  full_name,
+                  phone
                 )
               `)
               .eq('id', payload.new.id)
@@ -436,8 +441,8 @@ export function OrdersPageClient({
                                 #{order.id.slice(-8)}
                               </span>
                               {getStatusBadge(order.status)}
-                              <Badge 
-                                variant={order.payment_method === 'cod' ? 'secondary' : 'outline'} 
+                              <Badge
+                                variant={order.payment_method === 'cod' ? 'secondary' : 'outline'}
                                 className="text-[10px] uppercase font-bold tracking-tight"
                               >
                                 {order.payment_method === 'cod' ? 'COD' : 'Transfer'}
@@ -476,38 +481,72 @@ export function OrdersPageClient({
                               {order.buyer_note}
                             </div>
                           )}
+
+                          {/* Buyer Address & Info Section */}
+                          <div className="mt-4 pt-4 border-t border-dashed space-y-3">
+                            <div className="flex items-start gap-2 text-xs">
+                              <MapPin className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                              <div className="space-y-1">
+                                <span className="font-bold block text-[10px] uppercase tracking-wider text-muted-foreground">Alamat Pengiriman</span>
+                                <p className="text-foreground leading-relaxed font-medium">
+                                  {order.profiles?.address || 'Alamat tidak tersedia'}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between text-[11px] bg-muted/30 p-2 rounded-lg border">
+                              <div className="flex items-center gap-2">
+                                <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-[10px]">
+                                  {order.profiles?.full_name?.charAt(0) || order.profiles?.phone?.charAt(0) || 'B'}
+                                </div>
+                                <span className="font-semibold">{order.profiles?.full_name || 'Pembeli'}</span>
+                              </div>
+                              <span className="text-muted-foreground tabular-nums">{order.profiles?.phone || '-'}</span>
+                            </div>
+                          </div>
                         </CardContent>
 
                         <div className="px-4 pb-4">
-                          {order.status === 'pending' && (
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setRejectingOrderId(order.id)}
-                                className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                              >
-                                Tolak
+                          <div className="flex flex-wrap gap-2 pt-2 border-t mt-4">
+                            <Link href={`/seller/orders/${order.id}`} className="flex-1">
+                              <Button variant="outline" size="sm" className="w-full h-10 rounded-xl gap-2 text-primary border-primary/10 hover:bg-primary/5">
+                                <Receipt className="h-4 w-4" />
+                                Detail & Cetak
                               </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => handleUpdateStatus(order.id, 'accepted')}
-                                className="flex-1 shadow-sm"
-                              >
-                                Terima
-                              </Button>
-                            </div>
-                          )}
+                            </Link>
 
-                          {order.status === 'accepted' && (
-                            <Button
-                              size="sm"
-                              onClick={() => handleUpdateStatus(order.id, 'in_delivery')}
-                              className="w-full shadow-sm bg-blue-600 hover:bg-blue-700"
-                            >
-                              Kirim Sekarang
-                            </Button>
-                          )}
+                            {order.status === 'pending' && (
+                              <div className="flex gap-2 w-full sm:w-auto flex-1">
+                                <Button
+                                  size="sm"
+                                  className="flex-1 h-10 rounded-xl bg-red-600 hover:bg-red-700"
+                                  onClick={() => {
+                                    setRejectingOrderId(order.id);
+                                    setSelectedReason("");
+                                  }}
+                                >
+                                  Tolak
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className="flex-1 h-10 rounded-xl bg-blue-600 hover:bg-blue-700"
+                                  onClick={() => handleUpdateStatus(order.id, 'accepted')}
+                                >
+                                  Terima
+                                </Button>
+                              </div>
+                            )}
+
+                            {order.status === 'accepted' && (
+                              <Button
+                                size="sm"
+                                className="flex-1 h-10 rounded-xl bg-purple-600 hover:bg-purple-700"
+                                onClick={() => handleUpdateStatus(order.id, 'in_delivery')}
+                              >
+                                Kirim Sekarang
+                              </Button>
+                            )}
+                          </div>
 
                           {order.status === 'in_delivery' && (
                             <div className="space-y-2">

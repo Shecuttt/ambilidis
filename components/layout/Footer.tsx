@@ -1,6 +1,7 @@
 import { siInstagram, siX, siFacebook } from "simple-icons";
 import Link from "next/link";
 import Image from "next/image";
+import { Copyright } from "./Copyright";
 
 export function Footer() {
   return (
@@ -36,9 +37,9 @@ export function Footer() {
         <div className="col-span-1">
           <h4 className="font-bold text-foreground mb-4 text-sm uppercase tracking-wider">Seller</h4>
           <ul className="space-y-2.5 text-sm text-muted-foreground">
-            <li><Link href="/login" className="hover:text-primary transition-colors">Daftar Toko</Link></li>
+            <li><Link href="/seller/login" className="hover:text-primary transition-colors">Daftar Toko</Link></li>
             <li><Link href="/seller/dashboard" className="hover:text-primary transition-colors">Dashboard</Link></li>
-            <li><Link href="#" className="hover:text-primary transition-colors">Pusat Bantuan</Link></li>
+            <li><Link href="/help-center" className="hover:text-primary transition-colors">Pusat Bantuan</Link></li>
           </ul>
         </div>
 
@@ -48,7 +49,7 @@ export function Footer() {
           <ul className="space-y-2.5 text-sm text-muted-foreground">
             <li><Link href="/terms" className="hover:text-primary transition-colors">Syarat & Ketentuan</Link></li>
             <li><Link href="/privacy" className="hover:text-primary transition-colors">Kebijakan Privasi</Link></li>
-            <li><Link href="#" className="hover:text-primary transition-colors">Hubungi Kami</Link></li>
+            <li><Link href="/contact-us" className="hover:text-primary transition-colors">Hubungi Kami</Link></li>
           </ul>
         </div>
       </div>
@@ -56,7 +57,7 @@ export function Footer() {
       <div className="max-w-7xl mx-auto px-4 mt-12 pt-8 border-t flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="flex flex-col md:flex-row items-center gap-4 md:gap-8">
           <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} Ambilidis.
+            <Copyright />
           </p>
           <div className="flex gap-4 text-[10px] text-muted-foreground/60 uppercase tracking-widest font-bold">
             <span>Fresh</span>

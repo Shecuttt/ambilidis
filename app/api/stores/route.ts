@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { updateTag } from 'next/cache';
 
 const supabaseAdmin = createAdminClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -72,7 +73,6 @@ export async function POST(request: Request) {
     const currentRoles = Array.isArray(profile?.role) ? profile.role : [];
     const rolesToAdd = ['seller', 'buyer'];
     const missingRoles = rolesToAdd.filter(r => !currentRoles.includes(r));
-
     if (missingRoles.length > 0) {
       const newRoles = [...currentRoles, ...missingRoles];
       await supabaseAdmin
@@ -82,8 +82,10 @@ export async function POST(request: Request) {
           agreed_at: null // Force re-agreement when becoming a seller
         })
         .eq('id', user.id);
+      updateTag('stores');
     }
 
+    updateTag('stores');
     return NextResponse.json({ success: true, store });
   } catch (err: any) {
     console.error("POST Stores Error:", err.message);
@@ -135,6 +137,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Failed to update store settings' }, { status: 500 });
     }
 
+    updateTag('stores');
     return NextResponse.json({ success: true, store: updatedStore });
   } catch (err: any) {
     console.error("PATCH Stores Error:", err.message);

@@ -59,7 +59,32 @@ export function CheckoutPageClient({ initialUser }: CheckoutPageClientProps) {
   const total = getTotal();
   const grandTotal = total + deliveryFee;
 
-  // ── Load profile address & buyer location from sessionStorage & fetch store coords ──
+  // Reusable distance calculation logic
+  const calculateAndSetDistance = async (lat: number, lng: number) => {
+    if (!storeId) return;
+    setIsCalcingDist(true);
+    try {
+      const { data } = await supabase
+        .from("stores")
+        .select("latitude, longitude")
+        .eq("id", storeId)
+        .single();
+
+      if (data?.latitude && data?.longitude) {
+        const dist = haversineKm(lat, lng, data.latitude, data.longitude);
+        const fee = calcDeliveryFee(dist);
+        setDistanceKm(dist);
+        setDeliveryFee(fee);
+      }
+    } catch (error) {
+      console.error("Error calculating distance:", error);
+      setDeliveryFee(MIN_DELIVERY_FEE);
+      setDistanceKm(null);
+    } finally {
+      setIsCalcingDist(false);
+    }
+  };
+
   useEffect(() => {
     if (!storeId || items.length === 0) return;
 
@@ -101,52 +126,16 @@ export function CheckoutPageClient({ initialUser }: CheckoutPageClientProps) {
 
     loadStoreInfo();
 
-    const calcDistance = async () => {
-      setIsCalcingDist(true);
-      try {
-        // 1. Buyer location from sessionStorage
-        const raw = sessionStorage.getItem("ambilidis_buyer_location");
-        if (!raw) {
-          setDeliveryFee(MIN_DELIVERY_FEE);
-          setDistanceKm(null);
-          return;
-        }
-        const buyerLoc: { lat: number; lng: number } = JSON.parse(raw);
-
-        // 2. Store coordinates from DB
-        const { data } = await supabase
-          .from("stores")
-          .select("latitude, longitude")
-          .eq("id", storeId)
-          .single();
-
-        if (!data?.latitude || !data?.longitude) {
-          setDeliveryFee(MIN_DELIVERY_FEE);
-          setDistanceKm(null);
-          return;
-        }
-
-        // 3. Calculate distance
-        const dist = haversineKm(
-          buyerLoc.lat,
-          buyerLoc.lng,
-          data.latitude,
-          data.longitude
-        );
-
-        const fee = calcDeliveryFee(dist);
-        setDistanceKm(dist);
-        setDeliveryFee(fee);
-      } catch (error) {
-        console.error("Error calculating distance:", error);
-        setDeliveryFee(MIN_DELIVERY_FEE);
-        setDistanceKm(null);
-      } finally {
-        setIsCalcingDist(false);
+    // Initial distance calculation from session
+    const initDistance = () => {
+      const raw = sessionStorage.getItem("ambilidis_buyer_location");
+      if (raw) {
+        const buyerLoc = JSON.parse(raw);
+        calculateAndSetDistance(buyerLoc.lat, buyerLoc.lng);
       }
     };
 
-    calcDistance();
+    initDistance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId, items.length]);
 
@@ -165,7 +154,7 @@ export function CheckoutPageClient({ initialUser }: CheckoutPageClientProps) {
                 Pesanan Anda telah diterima. Silakan tunggu konfirmasi dari penjual.
               </p>
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Link href="/orders">
                 <Button className="w-full">Lihat Pesanan Saya</Button>
               </Link>
@@ -237,6 +226,7 @@ export function CheckoutPageClient({ initialUser }: CheckoutPageClientProps) {
           deliveryFee,
           paymentMethod,
           buyerNote: buyerNote.trim() || null,
+          address: address.trim(),
         }),
       });
 
@@ -325,26 +315,39 @@ export function CheckoutPageClient({ initialUser }: CheckoutPageClientProps) {
           <div className="lg:col-span-2 space-y-6">
             {/* Delivery Address */}
             <Card>
-              <CardContent className="pt-6 space-y-4">
+              <CardContent className="pt-6 space-y-6">
                 <div className="flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-primary" />
-                  <h3 className="font-semibold">Alamat Pengiriman</h3>
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <MapPin className="h-5 w-5 text-primary" />
+                  </div>
+                  <h3 className="font-semibold text-lg">Alamat Pengiriman</h3>
                 </div>
 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="address">Alamat Lengkap</Label>
+                    <div className="flex flex-col gap-1">
+                      <Label htmlFor="address" className="text-base">Alamat Lengkap</Label>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Sertakan detail seperti nomor rumah, blok, patokan, atau warna pagar agar kurir lebih mudah menemukan lokasi Anda.
+                      </p>
+                    </div>
                     <Textarea
                       id="address"
-                      placeholder="Masukkan alamat pengiriman lengkap..."
+                      placeholder="Contoh: Jl. Mawar No. 123, Blok C, samping Masjid Al-Ikhlas (Pagar Hitam)"
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
                       rows={3}
+                      className="resize-none rounded-xl border-muted-foreground/20 focus:border-primary"
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Cari Lokasi Pengiriman</Label>
+                  <div className="space-y-3 pt-2">
+                    <div className="flex flex-col gap-1">
+                      <Label className="text-sm font-medium">Titik Lokasi (Map)</Label>
+                      <p className="text-[11px] text-muted-foreground">
+                        Tentukan titik di peta untuk menghitung biaya pengiriman otomatis.
+                      </p>
+                    </div>
                     <LocationSearch
                       onLocationSelect={async (location) => {
                         // Update address dengan lokasi yang dipilih
@@ -372,37 +375,38 @@ export function CheckoutPageClient({ initialUser }: CheckoutPageClientProps) {
                         sessionStorage.setItem("ambilidis_buyer_location", JSON.stringify(buyerLoc));
 
                         // Recalculate distance
-                        if (storeId) {
-                          const { data } = await supabase
-                            .from("stores")
-                            .select("latitude, longitude")
-                            .eq("id", storeId)
-                            .single();
-
-                          if (data?.latitude && data?.longitude) {
-                            const dist = haversineKm(
-                              location.lat,
-                              location.lng,
-                              data.latitude,
-                              data.longitude
-                            );
-                            const fee = calcDeliveryFee(dist);
-                            setDistanceKm(dist);
-                            setDeliveryFee(fee);
-                          }
-                        }
+                        calculateAndSetDistance(location.lat, location.lng);
                       }}
-                      placeholder="Cari alamat pengiriman..."
+                      placeholder="Cari lokasi di peta..."
                     />
                   </div>
                 </div>
 
-                {distanceKm !== null && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <MapPin className="h-4 w-4" />
-                    <span>Jarak pengiriman: {distanceKm.toFixed(1)} km</span>
-                  </div>
-                )}
+                <div className="pt-2">
+                  <p className="text-[10px] text-muted-foreground mb-3 italic">
+                    *Biaya pengiriman ditentukan berdasarkan titik lokasi di peta, mohon pastikan titik sudah tepat.
+                  </p>
+                  {distanceKm !== null ? (
+                    <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-xl border border-primary/10">
+                      <div className="bg-primary/20 p-1.5 rounded-full">
+                        <MapPin className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] uppercase font-bold text-primary/70 tracking-wider">Estimasi Jarak</span>
+                        <span className="text-sm font-bold text-foreground">{distanceKm.toFixed(1)} km dari toko</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100">
+                      <div className="bg-amber-100 p-1.5 rounded-full">
+                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                      </div>
+                      <p className="text-xs text-amber-800 font-medium">
+                        Cari lokasi di peta untuk menghitung biaya pengiriman.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
 

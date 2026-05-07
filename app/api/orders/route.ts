@@ -162,12 +162,28 @@ export async function POST(request: Request) {
       totalPrice, 
       deliveryFee, 
       paymentMethod, 
-      buyerNote 
+      buyerNote,
+      address
     } = body;
 
     if (!storeId || !items || items.length === 0) {
       return NextResponse.json({ error: 'Missing required order fields' }, { status: 400 });
     }
+
+    // Update profile address so user doesn't have to type it again next time
+    if (address) {
+      await supabaseAdmin
+        .from('profiles')
+        .update({ address })
+        .eq('id', user.id);
+    }
+
+    // Get profile data for snapshot
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('full_name, phone')
+      .eq('id', user.id)
+      .single();
 
     // 1. Create order using supabaseAdmin
     const { data: order, error: orderError } = await supabaseAdmin
@@ -179,6 +195,9 @@ export async function POST(request: Request) {
         delivery_fee: deliveryFee,
         payment_method: paymentMethod,
         buyer_note: buyerNote?.trim() || null,
+        shipping_address: address, // Snapshot of address
+        buyer_name: profile?.full_name || user.email?.split('@')[0], // Snapshot of name
+        buyer_phone: profile?.phone || null, // Snapshot of phone
         status: "pending",
       })
       .select()

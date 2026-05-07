@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { updateTag } from 'next/cache';
 
 // Admin client for operations that bypass RLS but are manually verified
 const supabaseAdmin = createAdminClient(
@@ -79,6 +80,8 @@ export async function POST(request: Request) {
       
       if (dbError) {
         console.error("Database update failed after upload:", dbError);
+      } else {
+        updateTag('stores');
       }
     }
 

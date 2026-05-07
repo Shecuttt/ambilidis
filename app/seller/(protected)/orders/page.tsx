@@ -50,6 +50,11 @@ async function getOrdersPageData() {
         quantity,
         price,
         products (name, unit)
+      ),
+      profiles!orders_buyer_id_fkey (
+        address,
+        full_name,
+        phone
       )
     `)
     .eq('store_id', store.id)

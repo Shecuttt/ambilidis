@@ -55,7 +55,7 @@ export function Navbar() {
           .from('stores')
           .select('logo_url')
           .eq('owner_id', user.id)
-          .single();
+          .maybeSingle();
 
         if (store?.logo_url) {
           setStoreLogo(store.logo_url);
@@ -203,7 +203,7 @@ export function Navbar() {
                           .from('profiles')
                           .select('role')
                           .eq('id', user.id)
-                          .single();
+                          .maybeSingle();
 
                         const currentRoles = Array.isArray(profile?.role) ? profile.role : [];
                         if (!currentRoles.includes('seller')) {
@@ -372,7 +372,7 @@ export function Navbar() {
                                 .from('profiles')
                                 .select('role')
                                 .eq('id', user.id)
-                                .single();
+                                .maybeSingle();
 
                               const currentRoles = Array.isArray(profile?.role) ? profile.role : [];
                               if (!currentRoles.includes('seller')) {

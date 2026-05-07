@@ -8,7 +8,7 @@ export default function PrivacyPage() {
     <div className="container mx-auto px-4 py-12 max-w-4xl">
       <h1 className="text-3xl font-bold mb-6 text-primary">Kebijakan Privasi</h1>
       <div className="prose prose-stone dark:prose-invert max-w-none space-y-6">
-        <p className="text-muted-foreground">Pembaruan Terakhir: {new Date().toLocaleDateString('id-ID')}</p>
+        <p className="text-muted-foreground">Pembaruan Terakhir: 8 Mei 2026</p>
         
         <section>
           <h2 className="text-xl font-semibold mb-3">1. Pendahuluan</h2>

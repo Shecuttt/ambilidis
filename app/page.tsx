@@ -8,11 +8,9 @@ import { Footer } from "@/components/layout/Footer";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 
-export const dynamic = "force-dynamic";
+import { Suspense } from "react";
 
-
-
-export default async function LandingPage() {
+async function HeroCTA() {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
   const { data: { user } } = await supabase.auth.getUser();
@@ -23,13 +21,39 @@ export default async function LandingPage() {
       .from('profiles')
       .select('role')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
     profile = data;
   }
 
   const roles = Array.isArray(profile?.role) ? profile.role : [];
   const isSeller = roles.includes('seller');
 
+  return (
+    <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-4 w-full">
+      <Link href="/discovery" className="w-full sm:w-auto">
+        <Button size="lg" className="w-full sm:w-auto h-12 sm:h-14 px-6 sm:px-8 text-base sm:text-lg rounded-2xl shadow-xl shadow-primary/20 hover:scale-105 transition-all">
+          Cari Toko Sekarang
+          <ArrowRight className="ml-2 h-5 w-5" />
+        </Button>
+      </Link>
+      {isSeller ? (
+        <Link href="/seller/dashboard" className="w-full sm:w-auto">
+          <Button variant="outline" size="lg" className="w-full sm:w-auto h-12 sm:h-14 px-6 sm:px-8 text-base sm:text-lg rounded-2xl border-2">
+            Dashboard Seller
+          </Button>
+        </Link>
+      ) : (
+        <Link href="/seller/setup" className="w-full sm:w-auto">
+          <Button variant="outline" size="lg" className="w-full sm:w-auto h-12 sm:h-14 px-6 sm:px-8 text-base sm:text-lg rounded-2xl border-2">
+            Daftarkan Toko Anda
+          </Button>
+        </Link>
+      )}
+    </div>
+  );
+}
+
+export default function LandingPage() {
   return (
     <>
       <Navbar />
@@ -54,27 +78,14 @@ export default async function LandingPage() {
                 Beli beras, telur, sayur, dan kebutuhan harian lainnya dari toko sembako terdekat. Dukung ekonomi tetangga, nikmati kemudahan antar.
               </p>
 
-              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-4 w-full">
-                <Link href="/discovery" className="w-full sm:w-auto">
-                  <Button size="lg" className="w-full sm:w-auto h-12 sm:h-14 px-6 sm:px-8 text-base sm:text-lg rounded-2xl shadow-xl shadow-primary/20 hover:scale-105 transition-all">
-                    Cari Toko Sekarang
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Button>
-                </Link>
-                {isSeller ? (
-                  <Link href="/seller/dashboard" className="w-full sm:w-auto">
-                    <Button variant="outline" size="lg" className="w-full sm:w-auto h-12 sm:h-14 px-6 sm:px-8 text-base sm:text-lg rounded-2xl border-2">
-                      Dashboard Seller
-                    </Button>
-                  </Link>
-                ) : (
-                  <Link href="/seller/setup" className="w-full sm:w-auto">
-                    <Button variant="outline" size="lg" className="w-full sm:w-auto h-12 sm:h-14 px-6 sm:px-8 text-base sm:text-lg rounded-2xl border-2">
-                      Daftarkan Toko Anda
-                    </Button>
-                  </Link>
-                )}
-              </div>
+              <Suspense fallback={
+                <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-4 w-full">
+                  <div className="h-14 w-full sm:w-48 bg-muted animate-pulse rounded-2xl" />
+                  <div className="h-14 w-full sm:w-48 bg-muted animate-pulse rounded-2xl" />
+                </div>
+              }>
+                <HeroCTA />
+              </Suspense>
 
               <div className="flex items-center justify-center lg:justify-start gap-8 pt-8 border-t border-border">
                 <div className="text-center lg:text-left">

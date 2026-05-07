@@ -18,7 +18,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatRp } from "@/lib/utils";
 import { formatOperatingHours } from "@/lib/store-utils";
-import { Clock } from "lucide-react";
+import { Clock, AlertCircle } from "lucide-react";
+import { useAuth } from "@/components/providers/AuthProvider";
 
 // ── Types ────────────────────────────────────────────────────
 interface StoreData {
@@ -46,6 +47,7 @@ interface ProductData {
 // ── Main Component ───────────────────────────────────────────
 export default function StoreDetail({ params }: { params: Promise<{ slug: string }> }) {
   const router = useRouter();
+  const { user } = useAuth();
   const { slug } = use(params);
 
   const [store, setStore] = useState<StoreData | null>(null);
@@ -85,7 +87,7 @@ export default function StoreDetail({ params }: { params: Promise<{ slug: string
       .from("stores")
       .select("id, name, description, logo_url, banner_url, is_open, tagline_today, address, operating_hours")
       .eq("slug", slug)
-      .single();
+      .maybeSingle();
 
     if (storeData) {
       setStore(storeData);
@@ -288,6 +290,16 @@ export default function StoreDetail({ params }: { params: Promise<{ slug: string
       {cartTotalItems > 0 && cartStoreId === store?.id && (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-linear-to-t from-background via-background to-transparent pb-6 z-30">
           <div className="max-w-4xl mx-auto">
+            {!user && (
+              <div className="mb-3 px-4 py-3 bg-amber-50 border border-amber-200/50 rounded-2xl flex items-center gap-3 shadow-sm animate-in slide-in-from-bottom-4 duration-500">
+                <div className="bg-amber-100 p-2 rounded-full shrink-0">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                </div>
+                <p className="text-xs leading-snug text-amber-900 font-medium">
+                  Keranjang bersifat sementara dan akan hilang jika Anda meninggalkan aplikasi tanpa login.
+                </p>
+              </div>
+            )}
             <Link href="/checkout">
               <Button className="w-full h-14 rounded-2xl shadow-lg flex items-center justify-between px-6 text-lg">
                 <div className="flex items-center gap-3">
