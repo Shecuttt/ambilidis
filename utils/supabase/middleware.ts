@@ -41,21 +41,35 @@ export async function updateSession(request: NextRequest) {
   // Refresh session if expired
   const { data: { user }, error } = await supabase.auth.getUser();
 
-  const isSellerRoute = request.nextUrl.pathname.startsWith('/seller');
-  const isCheckoutRoute = request.nextUrl.pathname.startsWith('/checkout');
-  const isOrdersRoute = request.nextUrl.pathname.startsWith('/orders');
-  const isLoginRoute = request.nextUrl.pathname.startsWith('/login');
+  // Check paths
+  const pathname = request.nextUrl.pathname;
+  const isSellerRoute = pathname.startsWith('/seller');
+  const isCheckoutRoute = pathname.startsWith('/checkout');
+  const isOrdersRoute = pathname.startsWith('/orders');
+  const isLoginRoute = pathname === '/login' || pathname === '/seller/login';
 
-  if (!user && (isSellerRoute || isCheckoutRoute || isOrdersRoute)) {
+  // 1. Redirect guest to login if accessing protected routes
+  // But EXCLUDE the login routes themselves
+  if (!user && (isSellerRoute || isCheckoutRoute || isOrdersRoute) && !isLoginRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
-    url.searchParams.set('redirect', request.nextUrl.pathname);
+    url.searchParams.set('redirect', pathname);
     return NextResponse.redirect(url);
   }
 
+  // 2. Redirect logged-in user away from login pages
   if (user && isLoginRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = '/';
+    
+    // If user is at seller login, redirect to seller dashboard
+    if (pathname.startsWith('/seller')) {
+      url.pathname = '/seller/dashboard';
+    } else {
+      url.pathname = '/';
+    }
+    
+    // Clear redirect param to avoid clutter
+    url.searchParams.delete('redirect');
     return NextResponse.redirect(url);
   }
 

@@ -1,130 +1,115 @@
--- Enable PostGIS extension for geolocation
-CREATE EXTENSION IF NOT EXISTS postgis;
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
 
--- 1. Profiles Table (extends auth.users)
-CREATE TABLE profiles (
-  id UUID REFERENCES auth.users(id) PRIMARY KEY,
-  full_name TEXT,
-  role TEXT CHECK (role IN ('seller', 'buyer')),
-  address TEXT,
-  location GEOGRAPHY(POINT, 4326),
-  created_at TIMESTAMPTZ DEFAULT NOW()
+CREATE TABLE public.deliveries (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  order_id uuid NOT NULL,
+  status text CHECK (status = ANY (ARRAY['waiting_pickup'::text, 'on_the_way'::text, 'delivered'::text])),
+  note text,
+  updated_by uuid,
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT deliveries_pkey PRIMARY KEY (id),
+  CONSTRAINT deliveries_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id),
+  CONSTRAINT deliveries_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.profiles(id)
 );
-
--- Index for fast location-based queries on profiles
-CREATE INDEX profiles_location_idx ON profiles USING GIST (location);
-
--- 2. Stores Table
-CREATE TABLE stores (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  owner_id UUID REFERENCES profiles(id) NOT NULL,
-  name TEXT NOT NULL,
-  slug TEXT UNIQUE,
-  description TEXT,
-  photo_url TEXT,
-  location GEOGRAPHY(POINT, 4326), -- PostGIS point for [longitude, latitude]
-  address TEXT,
-  is_open BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+CREATE TABLE public.order_items (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  order_id uuid NOT NULL,
+  product_id uuid NOT NULL,
+  quantity integer NOT NULL,
+  price numeric NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT order_items_pkey PRIMARY KEY (id),
+  CONSTRAINT order_items_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id),
+  CONSTRAINT order_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
 );
-
--- Index for fast nearest neighbor search
-CREATE INDEX stores_location_idx ON stores USING GIST (location);
--- Unique index for slug
-CREATE UNIQUE INDEX stores_slug_idx ON stores (slug);
-
--- 3. Products Table
-CREATE TABLE products (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  store_id UUID REFERENCES stores(id) ON DELETE CASCADE NOT NULL,
-  name TEXT NOT NULL,
-  description TEXT,
-  photo_url TEXT,
-  price NUMERIC NOT NULL,
-  unit TEXT NOT NULL, -- e.g., 'kg', 'pcs', 'bungkus'
-  is_available BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+CREATE TABLE public.order_status_logs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  order_id uuid NOT NULL,
+  status text NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT order_status_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT order_status_logs_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id)
 );
-
--- 4. Orders Table
-CREATE TABLE orders (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  buyer_id UUID REFERENCES profiles(id) NOT NULL,
-  store_id UUID REFERENCES stores(id) NOT NULL,
-  status TEXT CHECK (status IN ('pending', 'accepted', 'rejected', 'in_delivery', 'completed')) DEFAULT 'pending',
-  total_price NUMERIC NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+CREATE TABLE public.orders (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  buyer_id uuid NOT NULL,
+  store_id uuid NOT NULL,
+  status text DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'accepted'::text, 'rejected'::text, 'in_delivery'::text, 'completed'::text, 'canceled'::text, 'expired'::text])),
+  total_price numeric NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  platform_fee numeric DEFAULT 0,
+  delivery_fee numeric DEFAULT 0,
+  buyer_note text,
+  payment_token text,
+  payment_status text DEFAULT 'unpaid'::text,
+  payment_method text DEFAULT 'transfer'::text,
+  rejection_reason text,
+  shipping_address text,
+  buyer_name text,
+  buyer_phone text,
+  CONSTRAINT orders_pkey PRIMARY KEY (id),
+  CONSTRAINT orders_buyer_id_fkey FOREIGN KEY (buyer_id) REFERENCES public.profiles(id),
+  CONSTRAINT orders_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id)
 );
-
--- 5. Order Items Table
-CREATE TABLE order_items (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id UUID REFERENCES orders(id) ON DELETE CASCADE NOT NULL,
-  product_id UUID REFERENCES products(id) NOT NULL,
-  quantity INTEGER NOT NULL,
-  price NUMERIC NOT NULL, -- Price at the time of order
-  created_at TIMESTAMPTZ DEFAULT NOW()
+CREATE TABLE public.products (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  store_id uuid NOT NULL,
+  name text NOT NULL,
+  description text,
+  photo_url text,
+  price numeric NOT NULL,
+  unit text NOT NULL,
+  is_available boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT products_pkey PRIMARY KEY (id),
+  CONSTRAINT products_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id)
 );
-
--- Enable Row Level Security (RLS)
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE stores ENABLE ROW LEVEL SECURITY;
-ALTER TABLE products ENABLE ROW LEVEL SECURITY;
-ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
-ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
-
--- Basic Policies (can be refined later)
--- Users can manage their own profile
-CREATE POLICY "Users can view their own profile" ON profiles FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Users can insert their own profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
-CREATE POLICY "Users can update their own profile" ON profiles FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
-CREATE POLICY "Users can delete their own profile" ON profiles FOR DELETE USING (auth.uid() = id);
-
--- Public read access to stores and products
-CREATE POLICY "Open stores are viewable by everyone." ON stores FOR SELECT USING (is_open = true);
-CREATE POLICY "Sellers can view their own stores." ON stores FOR SELECT USING (auth.uid() = owner_id);
-CREATE POLICY "Public products are viewable by everyone." ON products FOR SELECT USING (true);
-
--- Sellers can manage their own store and products
-CREATE POLICY "Users can manage their own store." ON stores FOR UPDATE USING (auth.uid() = owner_id);
-CREATE POLICY "Users can delete their own store." ON stores FOR DELETE USING (auth.uid() = owner_id);
-CREATE POLICY "Sellers can create stores." ON stores FOR INSERT WITH CHECK (auth.uid() = owner_id);
-CREATE POLICY "Users can manage their store's products." ON products FOR ALL USING (
-  EXISTS (SELECT 1 FROM stores WHERE stores.id = products.store_id AND stores.owner_id = auth.uid())
+CREATE TABLE public.profiles (
+  id uuid NOT NULL,
+  full_name text,
+  created_at timestamp with time zone DEFAULT now(),
+  phone text UNIQUE,
+  address text,
+  location USER-DEFINED,
+  role ARRAY NOT NULL DEFAULT ARRAY['buyer'::text] CHECK (cardinality(role) > 0),
+  agreed_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT profiles_pkey PRIMARY KEY (id),
+  CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
 );
-
--- Buyers can read their own orders, sellers can read orders for their store
-CREATE POLICY "Users can read their own orders." ON orders FOR SELECT USING (
-  auth.uid() = buyer_id OR 
-  EXISTS (SELECT 1 FROM stores WHERE stores.id = orders.store_id AND stores.owner_id = auth.uid())
+CREATE TABLE public.ratings (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  order_id uuid NOT NULL UNIQUE,
+  store_id uuid NOT NULL,
+  buyer_id uuid NOT NULL,
+  rating smallint NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  complaints ARRAY,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT ratings_pkey PRIMARY KEY (id),
+  CONSTRAINT ratings_buyer_id_fkey FOREIGN KEY (buyer_id) REFERENCES auth.users(id),
+  CONSTRAINT ratings_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id),
+  CONSTRAINT ratings_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id)
 );
-
--- Buyers can create orders
-CREATE POLICY "Buyers can insert orders." ON orders FOR INSERT WITH CHECK (auth.uid() = buyer_id);
-
--- Sellers can update orders for their store (status, payment_status, rejection_reason)
-CREATE POLICY "Sellers can update orders." ON orders FOR UPDATE USING (
-  EXISTS (SELECT 1 FROM stores WHERE stores.id = orders.store_id AND stores.owner_id = auth.uid())
+CREATE TABLE public.stores (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  owner_id uuid NOT NULL,
+  name text NOT NULL,
+  description text,
+  photo_url text,
+  address text,
+  is_open boolean DEFAULT false,
+  created_at timestamp with time zone DEFAULT now(),
+  tagline_today text,
+  operating_hours jsonb,
+  latitude numeric,
+  longitude numeric,
+  updated_at timestamp with time zone DEFAULT now(),
+  logo_url text,
+  banner_url text,
+  slug text,
+  location USER-DEFINED,
+  CONSTRAINT stores_pkey PRIMARY KEY (id),
+  CONSTRAINT stores_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES public.profiles(id)
 );
-
--- Buyers can update orders (specifically to 'completed' or 'canceled')
-CREATE POLICY "Buyers can update their own orders." ON orders FOR UPDATE USING (
-  auth.uid() = buyer_id
-) WITH CHECK (
-  auth.uid() = buyer_id AND (status IN ('completed', 'canceled'))
-);
-
--- Order items matching policies
-CREATE POLICY "Users can read order items of their orders." ON order_items FOR SELECT USING (
-  EXISTS (SELECT 1 FROM orders WHERE orders.id = order_items.order_id AND (
-    orders.buyer_id = auth.uid() OR 
-    EXISTS (SELECT 1 FROM stores WHERE stores.id = orders.store_id AND stores.owner_id = auth.uid())
-  ))
-);
-CREATE POLICY "Buyers can insert order items." ON order_items FOR INSERT WITH CHECK (
-  EXISTS (SELECT 1 FROM orders WHERE orders.id = order_items.order_id AND orders.buyer_id = auth.uid())
-);
-
--- Realtime Setup
-ALTER PUBLICATION supabase_realtime ADD TABLE orders;

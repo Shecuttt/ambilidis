@@ -151,7 +151,7 @@ export function SellerSidebar({ store }: SellerSidebarProps) {
             <SidebarGroup>
               <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Main Menu</SidebarGroupLabel>
               <SidebarGroupContent>
-                <SidebarMenu className="gap-1">
+                <SidebarMenu className="gap-2">
                   {navItems.map((item) => {
                     const isActive = pathname === item.href || (item.href.includes("#") && pathname === item.href.split("#")[0]);
                     return (

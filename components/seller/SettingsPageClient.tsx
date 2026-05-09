@@ -13,9 +13,9 @@ interface SettingsPageClientProps {
   initialStore: any;
 }
 
-export function SettingsPageClient({ 
-  initialUser, 
-  initialStore 
+export function SettingsPageClient({
+  initialUser,
+  initialStore
 }: SettingsPageClientProps) {
   const router = useRouter();
   const [storeData, setStoreData] = useState(initialStore);
@@ -62,13 +62,13 @@ export function SettingsPageClient({
       <div>
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
           <Settings className="h-6 w-6 text-primary" />
-          Pengaturan Toko
+          Pengaturan {initialStore?.name}
         </h1>
         <p className="text-muted-foreground text-sm">Kelola informasi dan pengaturan tokomu.</p>
       </div>
-      
+
       {/* Store Settings */}
-      <StoreSettings 
+      <StoreSettings
         storeId={storeData.id}
         initialName={storeData.name}
         initialTagline={storeData.tagline_today || ""}

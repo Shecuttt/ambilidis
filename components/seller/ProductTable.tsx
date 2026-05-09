@@ -2,19 +2,7 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import { Trash2, Loader2, Package } from "lucide-react";
+import { Loader2, Package } from "lucide-react";
 import { formatRp } from "@/lib/utils";
 
 interface Product {
@@ -31,10 +19,9 @@ interface ProductTableProps {
   isLoading: boolean;
   togglingProductId: string | null;
   onToggleAvailability: (id: string, current: boolean) => void;
-  onDeleteProduct: (product: Product) => void;
 }
 
-export function ProductTable({ products, isLoading, togglingProductId, onToggleAvailability, onDeleteProduct }: ProductTableProps) {
+export function ProductTable({ products, isLoading, togglingProductId, onToggleAvailability }: ProductTableProps) {
   return (
     <div className="rounded-md border overflow-hidden">
       <Table>
@@ -45,19 +32,18 @@ export function ProductTable({ products, isLoading, togglingProductId, onToggleA
             <TableHead>Harga</TableHead>
             <TableHead>Satuan</TableHead>
             <TableHead className="text-center">Stok</TableHead>
-            <TableHead className="w-12"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+              <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin mx-auto" />
               </TableCell>
             </TableRow>
           ) : products.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+              <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                 Belum ada produk. Silakan tambah produk pertama Anda.
               </TableCell>
             </TableRow>
@@ -97,32 +83,6 @@ export function ProductTable({ products, isLoading, togglingProductId, onToggleA
                       {product.is_available ? "Tersedia" : "Habis"}
                     </span>
                   </div>
-                </TableCell>
-                <TableCell>
-                  <AlertDialog>
-                    <AlertDialogTrigger render={
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-600">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    } />
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Hapus Produk?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Apakah Anda yakin ingin menghapus <strong>{product.name}</strong>? Tindakan ini tidak dapat dibatalkan.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Batal</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => onDeleteProduct(product)}
-                          className="bg-red-600 hover:bg-red-700"
-                        >
-                          Hapus
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
                 </TableCell>
               </TableRow>
             ))

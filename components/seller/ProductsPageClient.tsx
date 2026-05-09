@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { Package, Loader2 } from "lucide-react";
+import { Package, Loader2, Info } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // Sub-components
 import { ProductTable } from "@/components/seller/ProductTable";
@@ -25,16 +26,16 @@ interface ProductsPageClientProps {
   initialProducts: Product[];
 }
 
-export function ProductsPageClient({ 
-  initialUser, 
-  initialStore, 
-  initialProducts 
+export function ProductsPageClient({
+  initialUser,
+  initialStore,
+  initialProducts
 }: ProductsPageClientProps) {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [isLoading, setIsLoading] = useState(false);
   const [storeData, setStoreData] = useState(initialStore);
-  
+
   // Per-product availability toggling
   const [togglingProductId, setTogglingProductId] = useState<string | null>(null);
 
@@ -54,7 +55,7 @@ export function ProductsPageClient({
           if (payload.eventType === 'INSERT') {
             setProducts(prev => [payload.new as Product, ...prev]);
           } else if (payload.eventType === 'UPDATE') {
-            setProducts(prev => prev.map(p => 
+            setProducts(prev => prev.map(p =>
               p.id === payload.new.id ? payload.new as Product : p
             ));
           } else if (payload.eventType === 'DELETE') {
@@ -73,39 +74,17 @@ export function ProductsPageClient({
     setTogglingProductId(productId);
     const newStatus = !currentStatus;
     setProducts(prev => prev.map(p => p.id === productId ? { ...p, is_available: newStatus } : p));
-    const { error } = await supabase.from('products').update({ is_available: newStatus }).eq('id', productId);
-    if (error) {
+    const response = await fetch(`/api/products/${productId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_available: newStatus }),
+    });
+
+    if (!response.ok) {
       setProducts(prev => prev.map(p => p.id === productId ? { ...p, is_available: currentStatus } : p));
       toast.error("Gagal mengupdate stok.");
     }
     setTogglingProductId(null);
-  };
-
-  const handleDeleteProduct = async (product: Product) => {
-    try {
-      // 1. Delete from storage if exists
-      if (product.photo_url) {
-        const urlParts = product.photo_url.split('/');
-        const fileName = urlParts[urlParts.length - 1];
-        const filePath = `${storeData.id}/${fileName}`;
-        
-        await supabase.storage
-          .from('products')
-          .remove([filePath]);
-      }
-
-      // 2. Delete from database
-      const { error } = await supabase.from('products').delete().eq('id', product.id);
-      
-      if (error) {
-        toast.error("Gagal menghapus produk: " + error.message);
-      } else {
-        toast.success("Produk berhasil dihapus");
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Gagal menghapus produk");
-    }
   };
 
   if (isLoading) {
@@ -127,12 +106,22 @@ export function ProductsPageClient({
           </h1>
           <p className="text-muted-foreground text-sm">Kelola stok dan informasi produk tokomu.</p>
         </div>
-        <AddProductDialog 
-          storeId={storeData.id} 
-          onProductAdded={(p) => setProducts([p, ...products])} 
+        <AddProductDialog
+          storeId={storeData.id}
+          onProductAdded={(p) => setProducts([p, ...products])}
         />
       </div>
-      
+
+      {/* Info Alert */}
+      <Alert className="bg-amber-50/50 border-amber-200">
+        <Info className="h-4 w-4 text-amber-600" />
+        <AlertTitle className="text-amber-800 font-bold text-sm">Informasi Produk</AlertTitle>
+        <AlertDescription className="text-amber-700 text-xs">
+          Untuk menjaga riwayat transaksi, produk tidak dapat dihapus permanen.
+          Jika produk sedang tidak tersedia atau ingin disembunyikan, silakan gunakan fitur switch <strong>Stok (Tersedia/Habis)</strong> pada tabel di bawah.
+        </AlertDescription>
+      </Alert>
+
       {/* Products Table */}
       <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
         <ProductTable
@@ -140,7 +129,6 @@ export function ProductsPageClient({
           isLoading={false}
           togglingProductId={togglingProductId}
           onToggleAvailability={handleToggleAvailability}
-          onDeleteProduct={handleDeleteProduct}
         />
       </div>
     </div>

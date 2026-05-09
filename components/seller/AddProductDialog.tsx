@@ -108,10 +108,11 @@ export function AddProductDialog({ storeId, onProductAdded }: AddProductDialogPr
         setIsUploadingPhoto(false);
       }
 
-      // 2. Insert product
-      const { data, error } = await supabase
-        .from('products')
-        .insert([{
+      // 2. Insert product using API
+      const response = await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           store_id: storeId,
           name: values.name,
           price: parseInt(values.price),
@@ -119,13 +120,17 @@ export function AddProductDialog({ storeId, onProductAdded }: AddProductDialogPr
           description: values.description,
           is_available: true,
           photo_url: photoUrl,
-        }])
-        .select();
+        }),
+      });
 
-      if (error) throw error;
+      const result = await response.json();
 
-      if (data) {
-        onProductAdded(data[0]);
+      if (!response.ok) {
+        throw new Error(result.error || 'Gagal menyimpan produk');
+      }
+
+      if (result.product) {
+        onProductAdded(result.product);
         toast.success("Produk berhasil ditambahkan!");
         reset();
         clearPhoto();
